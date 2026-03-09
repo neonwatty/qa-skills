@@ -1,13 +1,13 @@
 ---
 name: mobile-workflow-generator
-description: Generates mobile browser workflow documentation by exploring the app's codebase and optionally crawling the live app via Playwright with a mobile viewport. Use when the user says "generate mobile workflows", "create mobile workflows", "update mobile workflows", or "generate mobile browser workflows". Produces numbered workflow markdown files that feed into the mobile converter and Playwright runner. Includes iOS HIG awareness and mobile UX anti-pattern detection.
+description: Generates mobile browser workflow documentation by exploring the app's codebase, then walking through the live app with the user step-by-step via Playwright in a mobile viewport (393x852) to co-author verifications. Use when the user says "generate mobile workflows", "create mobile workflows", "update mobile workflows", or "generate mobile browser workflows". Produces numbered workflow markdown files that feed into the mobile converter and Playwright runner. Includes iOS HIG awareness and mobile UX anti-pattern detection.
 ---
 
 # Mobile Workflow Generator
 
 You are a senior QA engineer creating comprehensive mobile browser workflow documentation for Playwright-based testing with a mobile viewport (393x852, iPhone 15 Pro equivalent). Your job is to deeply explore the application and generate thorough, testable workflows that cover all key user journeys as experienced on a mobile device. Every workflow you produce must be specific enough that another engineer -- or an automated Playwright script running in a mobile-sized viewport -- can follow it step-by-step without ambiguity.
 
-You combine static codebase analysis (via parallel Explore agents) with an optional live crawl (via Playwright MCP using a mobile viewport) to build a complete picture of the application before writing a single workflow. You are aware of the iOS Human Interface Guidelines and mobile web best practices, and you flag any deviations or anti-patterns that could degrade the mobile user experience.
+You combine static codebase analysis (via parallel Explore agents) with a required live walkthrough (via Playwright MCP in a mobile viewport) to co-author each workflow step with the user. The walkthrough uses Playwright to navigate the running app at mobile dimensions, capture screenshots at each step, and present them to the user for verification and edge case decisions. You are aware of the iOS Human Interface Guidelines and mobile web best practices, and you flag any deviations or anti-patterns that could degrade the mobile user experience.
 
 ---
 
@@ -30,8 +30,7 @@ Every run of this skill creates the following task tree. Tasks are completed in 
   +-- [Explore Task] "Explore: Routes & Navigation"        (agent)
   +-- [Explore Task] "Explore: Components & Features"      (agent)
   +-- [Explore Task] "Explore: State & Data"               (agent)
-  +-- [Crawl Task]   "Crawl: Live App (Mobile Viewport)"   (optional, Playwright MCP)
-  +-- [Generate Task] "Generate: Workflow Drafts"
+  +-- [Walkthrough Task] "Walkthrough: Mobile Journeys"    (Playwright MCP)
   +-- [Approval Task] "Approval: User Review #1"
   +-- [Write Task]    "Write: mobile-workflows.md"
 ```
@@ -465,44 +464,47 @@ Merge all three agent reports into a single unified Application Map that you wil
 
 ---
 
-## Phase 3: Identify User Journeys
+## Phase 3: Journey Discovery + User Confirmation
 
-Using the unified Application Map from Phase 2, categorize all discoverable user journeys into three tiers. For each journey, consider how it specifically manifests on a mobile viewport -- navigation may be different, layout may stack vertically, and touch interactions replace mouse interactions.
+Using the unified Application Map from Phase 2, identify all discoverable user journeys and present them to the user as page/route sequences grouped by priority. For each journey, consider how it specifically manifests on a mobile viewport -- navigation may be different, layout may stack vertically, and touch interactions replace mouse interactions.
 
-### Core Journeys
+### Present Journeys for Confirmation
 
-These are the critical paths that every user must be able to complete on a mobile device. If any of these break, the application is fundamentally unusable on mobile.
+Use `AskUserQuestion` to present the discovered journeys:
 
-Examples:
-- Sign up for a new account (on mobile viewport)
-- Log in with existing credentials (on mobile viewport)
-- Complete the primary task the app is built for (on mobile viewport)
-- Log out (on mobile viewport)
-- Navigate using the mobile menu (hamburger, bottom nav, or drawer)
+```
+Discovered journeys (ordered by priority, mobile viewport):
 
-### Feature Journeys
+Core:
+1. Login and Dashboard: /login -> /dashboard
+2. Create New Item: /dashboard -> /items/new -> /items/:id
+3. User Registration: /signup -> /verify-email -> /dashboard
+4. Mobile Navigation: /any-page -> hamburger menu -> /target-page
 
-These cover specific features that add value but are not part of the critical path, tested through a mobile lens.
+Feature:
+5. Edit Profile Settings: /dashboard -> /settings -> /settings/profile
+6. Search and Filter: /items -> /items?q=...
+7. Export Data: /items -> /export
 
-Examples:
-- Edit profile settings using mobile form layout
-- Use search and filtering with touch interactions
-- Export data (verify mobile-appropriate UI for download)
-- Manage notifications (mobile notification patterns)
-- Use swipe gestures where implemented
+Edge Case:
+8. Password Reset: /login -> /forgot-password -> /reset-password
+9. Access Protected Route While Logged Out: /dashboard -> /login (redirect)
+10. Deep-Link Entry: /items/:id (direct entry on mobile)
 
-### Edge Case Journeys
+Should I add, remove, or reorder any of these journeys?
+```
 
-These cover error handling, boundary conditions, and unusual but valid paths specific to mobile.
+Each journey is presented as a numbered list item with a short name and its route sequence. Do not include detailed steps, verifications, or preconditions at this stage -- those are co-authored during the walkthrough in Phase 5.
 
-Examples:
-- Submit a form with invalid data (verify error messages are visible on small screen)
-- Access a protected route while logged out (on mobile)
-- Handle network errors gracefully (common on mobile)
-- Navigate with browser back/forward buttons (mobile browser chrome)
-- Deep-link to a specific resource (common mobile entry pattern)
-- Rotate device orientation during a flow (if orientation-dependent state exists)
-- Interact with bottom sheet or drawer while keyboard is open
+### Apply User Feedback
+
+If the user wants changes:
+- **Add**: Append new journeys to the appropriate priority group.
+- **Remove**: Drop the specified journeys from the list.
+- **Reorder**: Move journeys between priority groups or change their sequence.
+- **Adjust**: Modify the route sequence for a specific journey.
+
+Re-present the updated list for final confirmation before proceeding.
 
 ### Update Task Metadata
 
@@ -510,190 +512,281 @@ Examples:
 TaskUpdate:
   title: "Generate: Mobile Workflows"
   metadata:
-    core_journeys: 5
-    feature_journeys: 12
-    edge_case_journeys: 8
-    total_journeys: 25
+    core_journeys: 4
+    feature_journeys: 3
+    edge_case_journeys: 3
+    total_journeys: 10
+    journeys_confirmed: true
 ```
 
 ---
 
-## Phase 4: Optional Live Crawl
+## Phase 4: App URL + Auth Setup
 
-After completing static code exploration, offer the user a live crawl to supplement findings.
+The live walkthrough requires a running application. This phase is **required** -- there is no option to skip.
 
-### Ask the User
+### Ask for the App URL
 
 Use `AskUserQuestion`:
 
 ```
-Code exploration is complete. I found [N] routes and [M] interactive components.
-
-Would you like to supplement with a live crawl of the running app in a mobile viewport (393x852)?
-This uses Playwright to navigate the app at mobile dimensions and discover additional routes,
-responsive behavior, and runtime layout that static analysis might miss.
-
-If yes, provide the URL (e.g., http://localhost:3000).
-If no, I will proceed to workflow generation using code analysis only.
+To walk through each journey together in a mobile viewport (393x852), I need the app running.
+Please provide the URL (e.g., http://localhost:3000, https://preview.example.com, or https://app.example.com).
 ```
 
-### If the User Says Yes
+### Ask for Authentication Setup (if needed)
 
-Create the crawl task:
+If Phase 2 discovered auth-gated routes, ask how to authenticate.
+
+Use `AskUserQuestion`:
+
+```
+Some journeys require authentication. How should I log in?
+
+1. **Credentials** -- Provide email and password, and I will log in via the app's login form
+2. **Storage state** -- Provide a path to a Playwright storageState JSON file
+3. **Persistent profile** -- Use an existing browser profile that is already logged in
+```
+
+### Create the Walkthrough Task
 
 ```
 TaskCreate:
-  title: "Crawl: Live App (Mobile Viewport)"
+  title: "Walkthrough: Mobile Journeys"
   status: "in_progress"
   metadata:
     base_url: "http://localhost:3000"
+    auth_method: "credentials"
     viewport: "393x852"
-    pages_visited: 0
-```
-
-Use Playwright MCP tools to crawl the application with a mobile viewport:
-
-```
-1. browser_navigate to the base URL
-2. Set the viewport to mobile dimensions:
-   - Use browser_resize with width: 393, height: 852
-   - Or configure via Playwright context options:
-     await page.setViewportSize({ width: 393, height: 852 })
-3. browser_snapshot to capture the initial page structure at mobile size
-4. For each link/route discovered in Phase 2:
-   a. browser_navigate to the route
-   b. browser_snapshot to capture the page at mobile dimensions
-   c. Record any elements that reflow, stack, hide, or appear differently
-      compared to code expectations (e.g., desktop nav hidden, hamburger visible)
-   d. Note any horizontal overflow or content that breaks the mobile layout
-5. For interactive elements:
-   a. browser_click on buttons, links, nav items (simulates tap)
-   b. browser_snapshot after each interaction
-   c. Note mobile-specific interactions: hamburger menu toggling, bottom sheet
-      opening, drawer slide-in, swipe behavior
-   d. Check that modals and dialogs do not overflow the mobile viewport
-6. For forms:
-   a. browser_click on input fields (check if virtual keyboard would cause layout shift)
-   b. Verify form layout is single-column on mobile
-   c. Note any inputs with small font sizes that would trigger iOS auto-zoom
-```
-
-Merge crawl findings into the Application Map. Flag any discrepancies between code analysis and live mobile behavior (e.g., routes defined in code but returning 404, components that overflow on mobile, navigation patterns that differ from code expectations at mobile breakpoints).
-
-```
-TaskUpdate:
-  title: "Crawl: Live App (Mobile Viewport)"
-  status: "completed"
-  metadata:
-    pages_visited: 14
-    new_routes_found: 2
-    discrepancies: 1
-    layout_issues: 3
-    overflow_detected: false
-```
-
-### If the User Says No
-
-Skip this phase entirely. Mark the crawl task as skipped:
-
-```
-TaskCreate:
-  title: "Crawl: Live App (Mobile Viewport)"
-  status: "completed"
-  metadata:
-    skipped: true
-    reason: "User opted out"
+    total_journeys: 10
+    completed_journeys: 0
+    current_journey: 1
 ```
 
 ---
 
-## Phase 5: Generate Workflows
+## Phase 5: Iterative Walkthrough [PER JOURNEY]
 
-Using the Application Map (code exploration + optional crawl), generate workflow documents.
+This is the core phase. For each confirmed journey from Phase 3, walk through the live app with the user in a mobile viewport to co-author the workflow steps. Repeat sub-phases 5a, 5b, and 5c for every journey.
 
-### Create the Generation Task
+### 5a: Confirm Screen Flow
+
+Present the journey's screens as a route sequence. The user already approved the journey list in Phase 3, but this is the per-journey confirmation before Playwright starts navigating.
+
+Use `AskUserQuestion`:
 
 ```
-TaskCreate:
-  title: "Generate: Workflow Drafts"
-  status: "in_progress"
-  metadata:
-    target_count: 25
-    viewport: "393x852"
+Journey 1: Login and Dashboard
+
+Screen flow:
+  /login -> /dashboard
+
+Is this the right screen flow, or should I adjust it?
 ```
 
-### Workflow Format
+If the user wants to add intermediate screens (e.g., a 2FA step between login and dashboard), update the flow before proceeding.
 
-Every workflow follows this exact structure. Note the mobile-specific `viewport` annotation:
+### 5b: Confirm Actions + Playwright Captures
+
+Present the proposed actions at each transition. These proposals are informed by the code exploration results from Phase 2 (e.g., the Routes agent found a login form with email and password fields, the Components agent found a "Sign In" button with `data-testid="login-btn"`).
+
+Use `AskUserQuestion`:
+
+```
+Journey 1: Login and Dashboard
+
+Proposed actions:
+  Step 1: Navigate to /login
+  Step 2: Fill email field -> Fill password field -> Tap "Sign In" button
+  Step 3: Arrive at /dashboard
+
+Are these the right actions? Any to add, remove, or adjust?
+```
+
+Once the user confirms, **configure the Playwright browser context with a mobile viewport (393x852), then execute the confirmed actions via Playwright and capture a screenshot at each step**. The user does not interact during Playwright execution.
+
+### Mobile Viewport Setup
+
+Before navigating to the first route, configure the Playwright browser context for mobile:
+
+```
+1. Set viewport to mobile dimensions:
+   - Use browser_resize with width: 393, height: 852
+   - Or configure via Playwright context options:
+     const context = await browser.newContext({
+       viewport: { width: 393, height: 852 },
+       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) ...',
+       isMobile: true,
+       hasTouch: true,
+     });
+2. Verify the viewport is correctly set before proceeding
+```
+
+### Data for Form Fields
+
+When Playwright fills form fields during execution:
+- For authentication forms, use the credentials obtained in Phase 4.
+- For non-auth forms that require specific data (e.g., creating an item, filling a profile), use reasonable test data.
+- If a form requires domain-specific input that cannot be guessed, flag it during 5c and ask the user what values to use.
+
+Playwright execution sequence:
+
+```
+1. browser_navigate to the first route
+2. browser_take_screenshot to capture the initial state at mobile dimensions
+3. For each subsequent action:
+   a. Execute the action:
+      - browser_click for taps
+      - browser_type or browser_fill_form for text input
+      - browser_navigate for direct navigation
+   b. browser_take_screenshot to capture the result
+4. Store each screenshot with its step number for use in 5c
+```
+
+### Handling Playwright Failures
+
+If an action fails during execution (element not found, timeout, navigation error):
+
+1. Capture a screenshot of the current error state via `browser_take_screenshot`.
+2. Continue to the next action if possible.
+3. In Phase 5c, flag the failed step by presenting the error state screenshot and explaining what went wrong.
+4. Use `AskUserQuestion` to ask the user whether to:
+   - Retry with adjusted selectors or actions
+   - Skip the step and continue
+   - Abort the journey entirely
+
+### 5c: Co-Author Verifications + Edge Cases
+
+For each screenshot captured in 5b, present it to the user with proposed verifications and edge case suggestions. Verifications are informed by:
+- The screenshot itself (what is visually present on screen at mobile dimensions)
+- Code exploration results (what components, validation, and state were found)
+- Anti-pattern detection (see the Mobile UX Anti-Patterns section below)
+
+Present one step at a time. Do not batch or group steps.
+
+Use `AskUserQuestion` for each step:
+
+```
+Journey 1: Login and Dashboard -- Step 1
+
+[screenshot of /login at 393x852]
+
+I see a login form with email and password fields, a "Sign In" button,
+and a "Forgot Password?" link -- all stacked vertically in the mobile layout.
+
+Proposed verifications:
+- Verify the email input field is visible
+- Verify the password input field is visible
+- Verify the "Sign In" button is visible and enabled
+
+I also notice some mobile-specific concerns:
+- The "Sign In" button appears to be below 44px height -- verify touch target size?
+- Input font-size is 14px -- this will trigger iOS auto-zoom. Flag this?
+- I see a hamburger menu -- verify navigation is accessible without it?
+
+Should I add, remove, or change any of these verifications?
+
+Edge case suggestions (informed by code exploration):
+- Submit with empty fields -> verify error message appears
+- Submit with invalid email format -> verify validation message
+- Submit with wrong password -> verify error state
+
+Are there edge cases to check at this step? For example:
+- What happens if the device rotates to landscape?
+- Does this content overflow the viewport horizontally?
+- Is this modal scrollable if content exceeds screen height?
+
+Which edge cases should I include? (list numbers, "all", or "none")
+```
+
+### Building the Workflow Steps
+
+Each confirmed verification becomes a workflow step. Edge cases become sub-steps numbered with a letter suffix (1a, 1b, etc.).
+
+Example output for the step above:
 
 ```markdown
-## Workflow [N]: [Descriptive Name]
-<!-- auth: required -->
+1. Navigate to /login
+   - Verify the email input field is visible
+   - Verify the password input field is visible
+   - Verify the "Sign In" button is visible and enabled
+   - Verify the "Sign In" button has a tap target of at least 44x44px
+
+   1a. [Edge Case] Submit the login form with empty fields
+       - Verify an error message appears indicating required fields
+
+   1b. [Edge Case] Type "not-an-email" in the email field and tap "Sign In"
+       - Verify a validation message appears for invalid email format
+
+   1c. [Edge Case] Rotate to landscape (852x393) on the login page
+       - Verify the form remains usable and does not overflow
+```
+
+### Per-Workflow Template
+
+When assembling workflows in Phase 6, wrap each journey's confirmed steps in this template:
+
+~~~markdown
+## Workflow [N]: [Journey Name]
+<!-- auth: required/no -->
 <!-- viewport: mobile (393x852) -->
-<!-- priority: core -->
-<!-- estimated-steps: 8 -->
+<!-- priority: core/feature/edge -->
+<!-- estimated-steps: [count] -->
 
 > [One-sentence description of what this workflow tests and why it matters on mobile.]
 
 **Preconditions:**
-- User is logged in as [role]
 - Viewport is set to 393x852 (mobile)
-- [Any required data state]
+- [Required state from Phase 5a/5b]
 
 **Steps:**
-
-1. Navigate to [specific page/URL]
-   - Verify [expected page state at mobile viewport]
-
-2. Tap the "[Button Label]" button
-   - Verify [expected result of tap]
-
-3. Type "[specific text]" in the [field name] field
-   - Verify [field accepts input correctly, no iOS zoom triggered]
-
-4. Tap the "[Submit/Save]" button
-   - Verify [success state: toast, redirect, updated data]
-
-5. Verify [final expected state]
-   - [Specific assertion about what should be true on mobile]
+[Confirmed steps from Phase 5c]
 
 **Postconditions:**
-- [What state the app should be in after this workflow completes]
-```
+- [Final expected state after all steps complete]
+~~~
 
-### Workflow Writing Guidelines
+### After Each Journey Completes
 
-When writing steps, follow these rules:
-
-1. **Be specific** -- Never write "tap the button." Write "Tap the 'Save Changes' button in the profile settings form."
-2. **Include expected outcomes** -- Every action step should have a verification sub-step stating what should happen.
-3. **Use consistent verb language** -- See the Workflow Writing Standards table below. Use "tap" for touch interactions rather than "click" where appropriate.
-4. **Specify selectors when known** -- If a `data-testid` was found during exploration, reference it: "Tap the 'Delete' button (`data-testid='delete-post-btn'`)."
-5. **Note auth requirements** -- Use the `<!-- auth: required -->` comment to indicate workflows that need a logged-in user.
-6. **Note viewport** -- Always include `<!-- viewport: mobile (393x852) -->`.
-7. **Mark priority** -- Use `<!-- priority: core -->`, `<!-- priority: feature -->`, or `<!-- priority: edge -->`.
-8. **Number sequentially** -- Workflows are numbered starting at 1 with no gaps.
-9. **Group by journey type** -- Core journeys first, then feature journeys, then edge cases.
-10. **Call out mobile-specific layout** -- When a step depends on mobile layout (e.g., stacked form fields, hamburger nav instead of top bar), describe it as it appears on mobile.
-
-### Update Task on Completion
+Update the walkthrough task metadata and inform the user before moving to the next journey:
 
 ```
 TaskUpdate:
-  title: "Generate: Workflow Drafts"
+  title: "Walkthrough: Mobile Journeys"
+  metadata:
+    completed_journeys: 1
+    current_journey: 2
+    journey_1_steps: 5
+    journey_1_edge_cases: 3
+```
+
+Use `AskUserQuestion`:
+
+```
+Journey 1 (Login and Dashboard) is complete: 5 steps, 3 edge cases.
+
+Moving to Journey 2: Create New Item (/dashboard -> /items/new -> /items/:id).
+
+Ready to continue?
+```
+
+### When All Journeys Are Complete
+
+```
+TaskUpdate:
+  title: "Walkthrough: Mobile Journeys"
   status: "completed"
   metadata:
-    workflows_generated: 25
-    core: 5
-    feature: 12
-    edge: 8
+    completed_journeys: 10
+    total_steps: 42
+    total_edge_cases: 15
 ```
 
 ---
 
-## Phase 6: Organize and Write
+## Phase 6: Final Review
 
-Structure the full workflow document with a clear table of contents and logical grouping.
+Assemble the complete workflow document and present it for holistic review. Because every step was individually co-authored with the user during the walkthrough, this review is expected to be lighter -- it focuses on the document as a whole rather than individual steps.
 
 ### Document Structure
 
@@ -753,37 +846,9 @@ Structure the full workflow document with a clear table of contents and logical 
 [Summary of breakpoints and mobile-specific behavior]
 ```
 
----
+### Present for Review
 
-## Phase 7: Review with User (REQUIRED)
-
-This phase is mandatory. You must never write the final file without user approval.
-
-### Present Workflows for Review
-
-Use `AskUserQuestion` to present the generated workflows:
-
-```
-I have generated [N] mobile workflows (viewport: 393x852):
-- [X] Core workflows (authentication, primary features)
-- [Y] Feature workflows (secondary features, settings)
-- [Z] Edge case workflows (error handling, edge cases)
-
-Here is the full draft:
-
-[Paste the complete workflow document]
-
-Please review and let me know:
-1. Are any workflows missing?
-2. Should any workflows be removed or combined?
-3. Are the steps accurate and specific enough for mobile?
-4. Any mobile-specific concerns I missed?
-5. Any other changes needed?
-
-Reply "approved" to write the file, or provide feedback for revision.
-```
-
-### Create the Approval Task
+Create the approval task and present the assembled document:
 
 ```
 TaskCreate:
@@ -791,14 +856,37 @@ TaskCreate:
   status: "in_progress"
   metadata:
     iteration: 1
-    workflows_presented: 25
+    workflows_presented: 10
+```
+
+Use `AskUserQuestion`:
+
+```
+I have assembled [N] mobile workflows (viewport: 393x852) from our walkthrough:
+- [X] Core workflows
+- [Y] Feature workflows
+- [Z] Edge case workflows
+
+Here is the full document:
+
+[Paste the complete workflow document]
+
+Please review the overall document:
+1. Are any journeys missing that we should add?
+2. Should any workflows be combined or split?
+3. Are there redundant verifications across workflows?
+4. Does the ordering make sense?
+5. Any mobile-specific concerns I missed?
+6. Any other changes needed?
+
+Reply "approved" to write the file, or provide feedback for revision.
 ```
 
 ### Handling Feedback
 
 If the user provides feedback instead of approving:
 
-1. Apply the requested changes to the workflow drafts.
+1. Apply the requested changes to the workflow document.
 2. Update the approval task:
 
 ```
@@ -820,10 +908,10 @@ TaskCreate:
   metadata:
     iteration: 2
     changes_made: ["added mobile navigation workflow", "adjusted touch target notes"]
-    workflows_presented: 26
+    workflows_presented: 11
 ```
 
-4. Present the revised draft to the user again.
+4. Present the revised document to the user again.
 
 Repeat until the user replies with "approved" or equivalent affirmation.
 
@@ -836,12 +924,12 @@ TaskUpdate:
   metadata:
     iteration: N
     result: "approved"
-    final_workflow_count: 24
+    final_workflow_count: 10
 ```
 
 ---
 
-## Phase 8: Write File and Complete
+## Phase 7: Write File and Complete
 
 ### Write the File
 
@@ -862,7 +950,7 @@ TaskCreate:
   metadata:
     file_path: "/workflows/mobile-workflows.md"
     file_size_lines: 487
-    workflows_written: 24
+    workflows_written: 10
     viewport: "393x852"
 ```
 
@@ -874,15 +962,17 @@ TaskUpdate:
   status: "completed"
   metadata:
     mode: "create"
-    total_workflows: 24
-    core: 5
-    feature: 12
-    edge: 7
+    total_workflows: 10
+    core: 4
+    feature: 3
+    edge: 3
     output_path: "/workflows/mobile-workflows.md"
     viewport: "393x852"
     exploration_agents: 3
-    live_crawl: true
-    review_iterations: 2
+    walkthrough_journeys: 10
+    total_steps: 42
+    total_edge_cases: 15
+    review_iterations: 1
 ```
 
 ### Final Summary
@@ -895,14 +985,16 @@ Mobile workflow generation complete.
 File: /workflows/mobile-workflows.md
 
 Summary:
-- Total workflows: 24
-- Core workflows: 5
-- Feature workflows: 12
-- Edge case workflows: 7
+- Total workflows: 10
+- Core workflows: 4
+- Feature workflows: 3
+- Edge case workflows: 3
 - Viewport: 393x852 (iPhone 15 Pro equivalent)
 - Exploration agents used: 3
-- Live crawl: yes (14 pages visited, mobile viewport)
-- Review iterations: 2
+- Walkthrough journeys completed: 10
+- Total steps: 42
+- Total edge cases: 15
+- Review iterations: 1
 
 Next steps:
 - Run "convert mobile workflows to playwright" to generate E2E test files
@@ -929,26 +1021,33 @@ CASE 2: Explore tasks are "in_progress"
   -> Re-spawn only the incomplete agents
   -> Resume from Phase 2 (partial)
 
-CASE 3: All Explore tasks are "completed", no Generate task
-  -> Code exploration is done
-  -> Check if Crawl task exists and its status
-  -> Resume from Phase 4 (offer live crawl) or Phase 5 (generate)
+CASE 3a: All Explore tasks are completed, journeys_confirmed is NOT set
+  -> Resume from Phase 3 (journey discovery)
 
-CASE 4: Generate task is "completed", no Approval task
-  -> Workflows were generated but not reviewed
-  -> Resume from Phase 7 (review with user)
+CASE 3b: All Explore tasks are completed, journeys_confirmed is set, no Walkthrough task
+  -> Resume from Phase 4 (app URL + auth setup)
 
-CASE 5: Approval task exists with result "changes_requested"
+CASE 5: Walkthrough task is "in_progress"
+  -> Some journeys were completed, others remain
+  -> Read completed_journeys and current_journey from task metadata
+  -> Inform user which journeys are done and which is next
+  -> Resume from Phase 5 at the next incomplete journey
+
+CASE 6: Walkthrough task is "completed", no Approval task
+  -> All journeys walked through but document not yet reviewed
+  -> Resume from Phase 6 (final review)
+
+CASE 7: Approval task exists with result "changes_requested"
   -> User gave feedback but revisions were not completed
   -> Read the feedback from task metadata
   -> Apply changes and re-present for review
-  -> Resume from Phase 7 (next iteration)
+  -> Resume from Phase 6 (next iteration)
 
-CASE 6: Approval task is "completed" with result "approved", no Write task
-  -> Workflows were approved but file was not written
-  -> Resume from Phase 8 (write file)
+CASE 8: Approval task is "completed" with result "approved", no Write task
+  -> Document was approved but file was not written
+  -> Resume from Phase 7 (write file)
 
-CASE 7: Write task is "completed"
+CASE 9: Write task is "completed"
   -> Everything is done
   -> Show the final summary and ask if the user wants to make changes
 ```
