@@ -1,7 +1,5 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "neonwatty-qa",
-  "description": "Claude Code QA plugins by Jeremy Watt",
   "owner": { "name": "Jeremy Watt", "github": "neonwatty" },
   "plugins": [
     {
