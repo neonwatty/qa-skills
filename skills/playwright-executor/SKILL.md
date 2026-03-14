@@ -1,6 +1,6 @@
 ---
 name: playwright-executor
-description: Runs Playwright E2E test suites and reports results. Use this when the user says "run playwright tests", "execute e2e tests", "run e2e", or wants to execute and analyze Playwright spec files. Supports filtering by platform, auto-fix mode for failures, and generates summary reports.
+description: Runs Playwright E2E test suites and reports results. Use this when the user says "run playwright tests", "execute e2e tests", "run e2e", "test results", or "playwright test suite". Discovers test files, executes them with filtering options, parses results, presents summaries, and optionally auto-fixes failing tests using the --fix flag.
 argument-hint: "[spec-pattern] [--fix]"
 ---
 
@@ -10,34 +10,17 @@ You are a QA engineer running Playwright E2E test suites and reporting results. 
 
 ## Task List Integration
 
-**CRITICAL:** This skill uses Claude Code's task list system for progress tracking and session recovery. You MUST use TaskCreate, TaskUpdate, and TaskList tools throughout execution.
+**CRITICAL:** Use TaskCreate, TaskUpdate, and TaskList tools throughout execution.
 
-### Why Task Lists Matter Here
-- **Progress visibility:** User sees "Discovered 12 specs, running... 8/12 passed"
-- **Session recovery:** If interrupted, know which phase completed and resume
-- **Fix tracking:** Each failing test fix becomes a trackable task
-- **Result history:** Task metadata stores pass/fail counts for reporting
+| Task | Purpose |
+|------|---------|
+| Main task | Track overall execution |
+| Discover task | Track spec file discovery |
+| Execute task | Track test run |
+| Report task | Track result presentation |
+| Fix tasks | Track each failing test fix (fix mode only) |
 
-### Task Hierarchy
-```
-[Main Task] "Run: Playwright Tests"
-  |-- [Discover Task] "Discover: e2e/*.spec.ts files"
-  |-- [Execute Task] "Execute: npx playwright test"
-  |-- [Report Task] "Report: Test Results"
-  |-- [Fix Task] "Fix: failing-test-name" (fix mode only)
-```
-
-### Session Recovery Check
-**At the start of this skill, always check for existing tasks:**
-```
-1. Call TaskList to check for existing Playwright tasks
-2. If a "Run: Playwright Tests" task exists with status in_progress:
-   - Check if discovery completed (metadata has spec file list)
-   - Check if execution completed (metadata has results)
-   - Check for pending fix tasks
-   - Resume from appropriate phase
-3. If no tasks exist, proceed with fresh execution
-```
+**Session Recovery:** At startup, call TaskList. If a "Run: Playwright Tests" task exists in_progress, check sub-task metadata to determine which phase completed and resume from there.
 
 ## Arguments
 
@@ -56,14 +39,7 @@ This skill receives arguments via `$ARGUMENTS`. Parse them to determine which te
 
 Arguments can be combined: `/playwright-executor multi-user --fix --project chromium`
 
-**Parsing rules:**
-1. Split `$ARGUMENTS` on whitespace
-2. Extract `--fix` flag (boolean, remove from args)
-3. Extract `--project <value>` pair (remove both tokens from args)
-4. Remaining tokens are spec patterns
-5. If a token matches a known shorthand (`multi-user`, `browser`, `ios`, `mobile`), expand it to `e2e/{token}*.spec.ts`
-6. If a token looks like a glob or file path, use it directly
-7. If no spec pattern remains, default to `e2e/*.spec.ts`
+See [examples/invocations.md](examples/invocations.md) for full parsing rules.
 
 ## Process
 
@@ -309,30 +285,7 @@ Fix mode activates when `--fix` was passed as an argument or when the user says 
    - Add proper waits for async operations
    - Update expected values to match current behavior
 
-6. **For app bugs:** Spawn a fix agent:
-   ```
-   Task tool parameters:
-   - subagent_type: "general-purpose"
-   - model: "opus"
-   - prompt: |
-       You are fixing an application bug caught by a Playwright E2E test.
-
-       ## Failing Test
-       File: [spec file path]
-       Test: [test name]
-       Error: [error message]
-
-       ## Test Source
-       [Include the relevant test code]
-
-       ## Your Task
-       1. Read the application source code that the test exercises
-       2. Identify the root cause of the failure
-       3. Fix the application code (not the test)
-       4. Return a summary of changes made
-
-       Do NOT run tests -- the main workflow handles re-running.
-   ```
+6. **For app bugs:** Spawn a fix agent. See [references/agent-prompts.md](references/agent-prompts.md) for the full prompt.
 
 7. **Update fix task:**
    ```
@@ -367,15 +320,7 @@ Fix mode activates when `--fix` was passed as an argument or when the user says 
 
 ## Invocation Examples
 
-```
-/qa-skills:playwright-executor                              # run all specs
-/qa-skills:playwright-executor multi-user                   # multi-user specs only
-/qa-skills:playwright-executor browser --project chromium    # browser specs, chromium only
-/qa-skills:playwright-executor ios mobile                    # ios and mobile specs
-/qa-skills:playwright-executor --fix                         # run all and auto-fix failures
-/qa-skills:playwright-executor multi-user --fix              # run multi-user and auto-fix
-/qa-skills:playwright-executor e2e/custom*.spec.ts           # arbitrary glob pattern
-```
+See [examples/invocations.md](examples/invocations.md) for full invocation examples and argument parsing rules.
 
 ## Guidelines
 

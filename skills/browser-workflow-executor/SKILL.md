@@ -1,6 +1,6 @@
 ---
 name: browser-workflow-executor
-description: Executes browser-based user workflows from /workflows/browser-workflows.md using Claude-in-Chrome MCP. Use this when the user says "run browser workflows", "execute browser workflows", or "test browser workflows". Tests each workflow step by step, captures before/after screenshots, documents issues, and generates HTML reports with visual evidence of fixes.
+description: Executes browser-based user workflows from /workflows/browser-workflows.md using Claude-in-Chrome MCP. Use this when the user says "run browser workflows", "execute browser workflows", "test browser workflows", or "audit browser flows". Tests each workflow step by step, captures before/after screenshots, documents issues, and generates HTML reports with visual evidence of fixes.
 ---
 
 # Browser Workflow Executor Skill
@@ -9,13 +9,7 @@ You are a QA engineer executing user workflows in a real browser. Your job is to
 
 ## Task List Integration
 
-**CRITICAL:** This skill uses Claude Code's task list system for progress tracking and session recovery. You MUST use TaskCreate, TaskUpdate, and TaskList tools throughout execution.
-
-### Why Task Lists Matter Here
-- **Progress visibility:** User sees "3/8 workflows completed, 5 issues found"
-- **Session recovery:** If interrupted, resume from exact workflow/step
-- **Parallel fix coordination:** Track multiple fix agents working simultaneously
-- **Issue tracking:** Each issue becomes a trackable task with status
+**CRITICAL:** Use TaskCreate, TaskUpdate, and TaskList tools throughout execution for progress tracking and session recovery.
 
 ### Task Hierarchy
 ```
@@ -31,872 +25,107 @@ You are a QA engineer executing user workflows in a real browser. Your job is to
 
 ## Execution Modes
 
-This skill operates in two modes:
-
 ### Audit Mode (Default Start)
-- Execute workflows and identify issues
-- Capture **BEFORE screenshots** of all issues found
-- Document issues without fixing them
-- Present findings to user for review
+Execute workflows, identify issues, capture BEFORE screenshots, document without fixing, present findings for review.
 
 ### Fix Mode (User-Triggered)
-- User says "fix this issue" or "fix all issues"
-- Spawn agents to fix issues (one agent per issue)
-- Capture **AFTER screenshots** showing the fix
-- Generate HTML report with before/after comparison
+User says "fix this issue" or "fix all". Spawn fix agents, capture AFTER screenshots, verify locally, generate reports, create PR.
 
-**Flow:**
-```
-Audit Mode → Find Issues → Capture BEFORE → Present to User
-                                                    ↓
-                                        User: "Fix this issue"
-                                                    ↓
-Fix Mode → Spawn Fix Agents → Capture AFTER → Verify Locally
-                                                    ↓
-                              Run Tests → Fix Failing Tests → Run E2E
-                                                    ↓
-                                    All Pass → Generate Reports → Create PR
-```
+**Flow:** Audit Mode -> Find Issues -> Capture BEFORE -> Present to User -> (User triggers fix) -> Fix Mode -> Spawn Agents -> Capture AFTER -> Verify -> Generate Reports -> Create PR
 
 ## Process
 
-### Phase 1: Read Workflows and Initialize Task List
+### Phase 1: Read Workflows and Initialize
 
-**First, check for existing tasks (session recovery):**
-1. Call `TaskList` to check for existing workflow tasks
-2. If tasks exist with status `in_progress` or `pending`:
-   - Inform user: "Found existing session. Workflows completed: [list]. Resuming from: [workflow name]"
-   - Skip to the incomplete workflow
-3. If no existing tasks, proceed with fresh execution
+**Session recovery:** Call TaskList first. If in_progress workflow tasks exist, inform user and resume from the incomplete workflow.
 
-**Read and parse workflows:**
-1. Read the file `/workflows/browser-workflows.md`
-2. **If the file does not exist or is empty:**
-   - Stop immediately
-   - Inform the user: "Could not find `/workflows/browser-workflows.md`. Please create this file with your workflows before running this skill."
-   - Provide a brief example of the expected format
-   - Do not proceed further
-3. Parse all workflows (each starts with `## Workflow:`)
-4. If no workflows are found in the file, inform the user and stop
-5. List the workflows found and ask the user which one to execute (or all)
-
-**Create workflow tasks:**
-After user confirms which workflows to run, create a task for each:
-
-```
-For each workflow to execute, call TaskCreate:
-- subject: "Execute: [Workflow Name]"
-- description: |
-    Execute browser workflow: [Workflow Name]
-    Steps: [count] steps
-    File: /workflows/browser-workflows.md
-
-    Steps summary:
-    1. [Step 1 brief]
-    2. [Step 2 brief]
-    ...
-- activeForm: "Executing [Workflow Name]"
-```
-
-This creates the task structure that enables progress tracking and session recovery.
+1. Read `/workflows/browser-workflows.md`. If missing or empty, stop and inform the user.
+2. Parse all workflows (each starts with `## Workflow:`)
+3. List workflows and ask user which to execute (or all)
+4. Create a task for each selected workflow: "Execute: [Workflow Name]"
 
 ### Phase 2: Initialize Browser
 
-1. Call `tabs_context_mcp` with `createIfEmpty: true` to get/create a tab
+1. Call `tabs_context_mcp` with `createIfEmpty: true`
 2. Store the `tabId` for all subsequent operations
-3. Take an initial screenshot to confirm browser is ready
+3. Take initial screenshot to confirm browser is ready
+
+See [references/chrome-mcp-tools.md](references/chrome-mcp-tools.md) for the full MCP tool reference.
 
 ### Phase 3: Execute Workflow
 
-**Before starting each workflow, update its task:**
-```
-TaskUpdate:
-- taskId: [workflow task ID]
-- status: "in_progress"
-```
+Set each workflow task to in_progress before starting. For each numbered step:
 
-For each numbered step in the workflow:
+1. **Announce** the step
+2. **Execute** using the appropriate MCP tool (navigate, find+click, type, read_page, drag, scroll, wait)
+3. **Screenshot** after each major step, saving to `workflows/screenshots/browser-audit/wfNN-stepNN.png`
+4. **Observe** for UI/UX issues, technical problems, console errors
+5. **Record** observations before moving to next step
 
-1. **Announce** the step you're about to execute
-2. **Execute** using the appropriate MCP tool:
-   - "Navigate to [URL]" → `navigate`
-   - "Click [element]" → `find` to locate, then `computer` with `left_click`
-   - "Type [text]" → `computer` with `type` action
-   - "Verify [condition]" → `read_page` or `get_page_text` to check
-   - "Drag [element]" → `computer` with `left_click_drag`
-   - "Scroll [direction]" → `computer` with `scroll`
-   - "Wait [seconds]" → `computer` with `wait`
-3. **Screenshot** after each major step:
-   - Use `computer` with `action: screenshot` to capture the current state
-   - **Save screenshots to disk** using `gif_creator` or by writing base64 data via Bash:
-     ```
-     Save to: workflows/screenshots/browser-audit/wfNN-stepNN.png
-     ```
-   - Use the naming convention: `wf{workflow_number:02d}-step{step_number:02d}.png`
-   - These files will be embedded in the HTML audit report
-4. **Observe** and note:
-   - Did it work as expected?
-   - Any UI/UX issues? (confusing labels, poor contrast, slow response)
-   - Any technical problems? (errors in console, failed requests)
-   - Any potential improvements or feature ideas?
-5. **Record** your observations before moving to next step
+When an issue is found, create an issue task linked to the workflow task with details: workflow, step, description, severity, current vs expected behavior, and screenshot path.
 
-**When an issue is found, create an issue task:**
-```
-TaskCreate:
-- subject: "Issue: [Brief issue description]"
-- description: |
-    **Workflow:** [Workflow name]
-    **Step:** [Step number and description]
-    **Issue:** [Detailed description]
-    **Severity:** [High/Med/Low]
-    **Current behavior:** [What's wrong]
-    **Expected behavior:** [What it should do]
-    **Screenshot:** [Path to before screenshot]
-- activeForm: "Documenting issue"
-
-Then link it to the workflow task:
-TaskUpdate:
-- taskId: [issue task ID]
-- addBlockedBy: [workflow task ID]
-```
-
-**After completing all steps in a workflow:**
-```
-TaskUpdate:
-- taskId: [workflow task ID]
-- status: "completed"
-- metadata: {"issuesFound": [count], "stepsPassed": [count], "stepsFailed": [count]}
-```
+After completing all steps, mark workflow task completed with metadata (issuesFound, stepsPassed, stepsFailed).
 
 ### Phase 4: UX Platform Evaluation [DELEGATE TO AGENT]
 
-**Purpose:** Evaluate whether the web app follows web platform conventions. Delegate this research to an agent to save context.
+Spawn a general-purpose agent (opus model) to evaluate the web app against platform UX conventions: navigation patterns, hover/focus states, keyboard navigation, component appropriateness, responsiveness, and accessibility.
 
-**Use the Task tool to spawn an agent:**
-
-```
-Task tool parameters:
-- subagent_type: "general-purpose"
-- model: "opus" (thorough research and evaluation)
-- prompt: |
-    You are evaluating a web app for web platform UX compliance.
-
-    ## Page Being Evaluated
-    [Include current page URL and brief description]
-
-    ## Quick Checklist - Evaluate Each Item
-
-    **Navigation:**
-    - Browser back button works correctly
-    - URLs reflect current state (deep-linkable)
-    - No mobile-style bottom tab bar
-    - Navigation works without gestures (click-based)
-
-    **Interactions:**
-    - All interactive elements have hover states
-    - Keyboard navigation works (Tab, Enter, Escape)
-    - Focus indicators are visible
-    - No gesture-only interactions for critical features
-
-    **Components:**
-    - Uses web-appropriate form components
-    - No iOS-style picker wheels
-    - No Android-style floating action buttons
-    - Modals don't unnecessarily go full-screen
-
-    **Responsive/Visual:**
-    - Layout works at different viewport widths
-    - No mobile-only viewport restrictions
-    - Text is readable without zooming
-
-    **Accessibility:**
-    - Color is not the only indicator of state
-    - Form fields have labels
-
-    ## Reference Comparison
-
-    Search for reference examples using WebSearch:
-    - "web app [page type] design Dribbble"
-    - "[well-known web app like Linear/Notion/Figma] [page type] screenshot"
-
-    Visit 2-3 reference examples and compare:
-    - Navigation placement and behavior
-    - Component types and interaction patterns
-    - Hover/focus states
-
-    ## Return Format
-
-    Return a structured report:
-    ```
-    ## UX Platform Evaluation: [Page Name]
-
-    ### Checklist Results
-    | Check | Pass/Fail | Notes |
-    |-------|-----------|-------|
-
-    ### Reference Comparison
-    - Reference apps compared: [list]
-    - Key differences found: [list]
-
-    ### Issues Found
-    - [Issue 1]: [Description] (Severity: High/Med/Low)
-
-    ### Recommendations
-    - [Recommendation 1]
-    ```
-```
-
-**After agent returns:** Incorporate findings into the workflow report and continue.
+See [references/agent-prompts.md](references/agent-prompts.md) for the full UX evaluation agent prompt.
 
 ### Phase 5: Record Findings
 
-**CRITICAL:** After completing EACH workflow, immediately write findings to the log file. Do not wait until all workflows are complete.
+**CRITICAL:** After completing EACH workflow, immediately append to `.claude/plans/browser-workflow-findings.md`. Include: workflow status, step results, issues found, platform appropriateness, UX notes, technical problems, feature ideas, and screenshot references.
 
-1. After each workflow completes, append to `.claude/plans/browser-workflow-findings.md`
-2. If the file doesn't exist, create it with a header first
-3. Use the following format for each workflow entry:
-
-```markdown
----
-### Workflow [N]: [Name]
-**Timestamp:** [ISO datetime]
-**Status:** Passed/Failed/Partial
-
-**Steps Summary:**
-- Step 1: [Pass/Fail] - [brief note]
-- Step 2: [Pass/Fail] - [brief note]
-...
-
-**Issues Found:**
-- [Issue description] (Severity: High/Med/Low)
-
-**Platform Appropriateness:**
-- Web conventions followed: [Yes/Partially/No]
-- Issues: [List any platform anti-patterns found]
-- Reference comparisons: [Apps/pages compared, if any]
-
-**UX/Design Notes:**
-- [Observation]
-
-**Technical Problems:**
-- [Problem] (include console errors if any)
-
-**Feature Ideas:**
-- [Idea]
-
-**Screenshots:** [list of screenshot IDs captured]
-```
-
-4. This ensures findings are preserved even if session is interrupted
-5. Continue to next workflow after recording
+This ensures findings are preserved even if the session is interrupted.
 
 ### Phase 6: Generate Audit Report (HTML with Screenshots)
 
-After completing all workflows (or when user requests), generate an HTML audit report with embedded screenshots.
+Generate an HTML audit report at `workflows/browser-audit-report.html` with embedded screenshots from Phase 3. Every workflow section MUST include `<img>` tags with relative paths to screenshots.
 
-**CRITICAL:** The audit report MUST be HTML (not just markdown) and MUST embed screenshots from Phase 3. This is the primary deliverable.
+See [examples/audit-report-template.html](examples/audit-report-template.html) for the required HTML structure.
 
-**Create audit report task:**
-```
-TaskCreate:
-- subject: "Generate: HTML Audit Report"
-- description: "Generate HTML report with screenshots for all workflow results"
-- activeForm: "Generating HTML audit report"
+See [references/screenshot-guide.md](references/screenshot-guide.md) for screenshot directory structure and naming conventions.
 
-TaskUpdate:
-- taskId: [report task ID]
-- status: "in_progress"
-```
-
-**Generate the HTML report:**
-1. Call `TaskList` to get summary of all workflow and issue tasks
-2. Read `.claude/plans/browser-workflow-findings.md` for detailed findings
-3. Write HTML report to `workflows/browser-audit-report.html`
-
-**HTML Report Structure:**
-```html
-<!-- Required sections: -->
-<h1>Browser Workflow Audit Report</h1>
-<p>Date: [timestamp] | Environment: [URL]</p>
-
-<!-- Summary table -->
-<table>
-  <tr><th>#</th><th>Workflow</th><th>Status</th><th>Steps</th><th>Notes</th></tr>
-  <!-- One row per workflow with PASS/FAIL/SKIP badge -->
-</table>
-
-<!-- Per-workflow detail sections -->
-<h2>Workflow N: [Name]</h2>
-<p>Status: PASS/FAIL/SKIP</p>
-<h3>Steps</h3>
-<ol>
-  <li>Step description — PASS/FAIL
-    <br><img src="screenshots/browser-audit/wfNN-stepNN.png" style="max-width:800px; border:1px solid #ddd; border-radius:8px; margin:8px 0;">
-  </li>
-</ol>
-```
-
-4. **Every workflow section MUST include `<img>` tags** referencing the screenshots saved during Phase 3. Use relative paths: `screenshots/browser-audit/wfNN-stepNN.png`
-5. Style with clean design, professional appearance, app accent color
-6. Update the HTML file **incrementally after EACH workflow** so partial results are always viewable
-
-**Also present a text summary to the user:**
-```
-## Audit Complete
-
-**Workflows Executed:** [completed count]/[total count]
-**Issues Found:** [issue task count]
-  - High severity: [count]
-  - Medium severity: [count]
-  - Low severity: [count]
-
-**Report:** workflows/browser-audit-report.html
-
-What would you like to do?
-- "fix all" - Fix all issues
-- "fix 1,3,5" - Fix specific issues by number
-- "done" - End session
-```
-
-```
-TaskUpdate:
-- taskId: [report task ID]
-- status: "completed"
-```
+Present a text summary showing workflows executed, issues found by severity, report path, and options: "fix all" / "fix 1,3,5" / "done".
 
 ### Phase 7: Screenshot Management
 
-**Screenshot Directory Structure:**
-```
-workflows/
-├── screenshots/
-│   ├── {workflow-name}/
-│   │   ├── before/
-│   │   │   ├── 01-hover-states-missing.png
-│   │   │   ├── 02-keyboard-nav-broken.png
-│   │   │   └── ...
-│   │   └── after/
-│   │       ├── 01-hover-states-added.png
-│   │       ├── 02-keyboard-nav-fixed.png
-│   │       └── ...
-│   └── {another-workflow}/
-│       ├── before/
-│       └── after/
-├── browser-workflows.md
-└── browser-changes-report.html
-```
+Before/after screenshots use matching filenames in separate directories per workflow.
 
-**Screenshot Naming Convention:**
-- `{NN}-{descriptive-name}.png`
-- Examples:
-  - `01-hover-states-missing.png` (before)
-  - `01-hover-states-added.png` (after)
-
-**Capturing BEFORE Screenshots:**
-1. When an issue is identified during workflow execution
-2. Take screenshot BEFORE any fix is applied
-3. Save to `workflows/screenshots/{workflow-name}/before/`
-4. Use descriptive filename that identifies the issue
-5. Record the screenshot path in the issue tracking
-
-**Capturing AFTER Screenshots:**
-1. Only after user approves fixing an issue
-2. After fix agent completes, refresh the browser tab
-3. Take screenshot showing the fix
-4. Save to `workflows/screenshots/{workflow-name}/after/`
-5. Use matching filename pattern to the before screenshot
+See [references/screenshot-guide.md](references/screenshot-guide.md) for the full directory structure, naming conventions, and capture procedures.
 
 ### Phase 8: Fix Mode Execution [DELEGATE TO AGENTS]
 
-When user triggers fix mode ("fix this issue" or "fix all"):
+When user triggers fix mode:
 
-1. **Get issue list from tasks:**
-   ```
-   Call TaskList to get all issue tasks (subject starts with "Issue:")
-   Display to user:
+1. List all issue tasks with before screenshots, ask which to fix
+2. Create a fix task for each issue to fix, linked to the original issue task
+3. Spawn one agent per issue (in parallel for independent issues), each exploring the codebase and implementing minimal focused changes
+4. After all agents complete: refresh browser, capture AFTER screenshots, verify fixes visually
 
-   Issues found:
-   1. [Task ID: X] Missing hover states on buttons - BEFORE: 01-hover-states-missing.png
-   2. [Task ID: Y] Keyboard navigation broken - BEFORE: 02-keyboard-nav-broken.png
-   3. [Task ID: Z] Back button doesn't work - BEFORE: 03-back-button-broken.png
-
-   Fix all issues? Or specify which to fix: [1,2,3 / all / specific numbers]
-   ```
-
-2. **Create fix tasks for each issue to fix:**
-   ```
-   For each issue the user wants fixed:
-
-   TaskCreate:
-   - subject: "Fix: [Issue brief description]"
-   - description: |
-       Fixing issue from task [issue task ID]
-       **Issue:** [Issue name and description]
-       **Severity:** [High/Med/Low]
-       **Current behavior:** [What's wrong]
-       **Expected behavior:** [What it should do]
-       **Screenshot reference:** [Path to before screenshot]
-   - activeForm: "Fixing [issue brief]"
-
-   TaskUpdate:
-   - taskId: [fix task ID]
-   - addBlockedBy: [issue task ID]  # Links fix to its issue
-   - status: "in_progress"
-   ```
-
-3. **Spawn one agent per issue** using the Task tool. For independent issues, spawn agents in parallel (all in a single message):
-
-```
-Task tool parameters (for each issue):
-- subagent_type: "general-purpose"
-- model: "opus" (thorough code analysis and modification)
-- prompt: |
-    You are fixing a specific UX issue in a web application.
-
-    ## Issue to Fix
-    **Issue:** [Issue name and description]
-    **Severity:** [High/Med/Low]
-    **Current behavior:** [What's wrong]
-    **Expected behavior:** [What it should do]
-    **Screenshot reference:** [Path to before screenshot]
-
-    ## Your Task
-
-    1. **Explore the codebase** to understand the implementation
-       - Use Glob to find relevant files
-       - Use Grep to search for related code
-       - Use Read to examine files
-
-    2. **Plan the fix**
-       - Identify which files need changes
-       - Consider side effects
-
-    3. **Implement the fix**
-       - Make minimal, focused changes
-       - Follow existing code patterns
-       - Do not refactor unrelated code
-
-    4. **Return a summary:**
-    ```
-    ## Fix Complete: [Issue Name]
-
-    ### Changes Made
-    - [File 1]: [What changed]
-    - [File 2]: [What changed]
-
-    ### Files Modified
-    - src/components/Button.css (MODIFIED)
-    - src/styles/global.css (MODIFIED)
-
-    ### Testing Notes
-    - [How to verify the fix works]
-    ```
-
-    Do NOT run tests - the main workflow will handle that.
-```
-
-4. **After all fix agents complete:**
-   - Collect summaries from each agent
-   - Refresh the browser
-   - Capture AFTER screenshots for each fix
-   - Verify fixes visually
-   - Track all changes made
-
-   **Update fix tasks with results:**
-   ```
-   For each completed fix:
-
-   TaskUpdate:
-   - taskId: [fix task ID]
-   - status: "completed"
-   - metadata: {
-       "filesModified": ["src/components/Button.css", "src/styles/global.css"],
-       "afterScreenshot": "workflows/screenshots/{workflow}/after/{file}.png"
-     }
-   ```
-
-   **Update issue tasks to reflect fix status:**
-   ```
-   TaskUpdate:
-   - taskId: [issue task ID]
-   - status: "completed"
-   - metadata: {"fixedBy": [fix task ID], "fixedAt": "[ISO timestamp]"}
-   ```
+See [references/agent-prompts.md](references/agent-prompts.md) for the full fix agent and verification agent prompts.
 
 ### Phase 9: Local Verification [DELEGATE TO AGENT]
 
-**CRITICAL:** After making fixes, verify everything works locally before creating a PR.
+Spawn a verification agent to run the test suite, linting, type checking, and E2E tests. If tests fail, the agent analyzes failures, fixes broken tests, and re-runs until all pass.
 
-**Create verification task:**
-```
-TaskCreate:
-- subject: "Verify: Run test suite"
-- description: |
-    Run all tests to verify fixes don't break existing functionality.
-    Fixes applied: [list of fix task IDs]
-    Files modified: [aggregated list from fix task metadata]
-- activeForm: "Running verification tests"
+If PASS: proceed to report generation. If FAIL: review with user, spawn another agent.
 
-TaskUpdate:
-- taskId: [verification task ID]
-- status: "in_progress"
-```
+### Phase 10-11: Generate Reports [DELEGATE TO AGENTS]
 
-**Use the Task tool to spawn a verification agent:**
+Spawn agents (haiku model) to generate both HTML and Markdown reports with before/after screenshot comparisons, files changed, and explanations.
 
-```
-Task tool parameters:
-- subagent_type: "general-purpose"
-- model: "opus" (thorough test analysis and fixing)
-- prompt: |
-    You are verifying that code changes pass all tests.
-
-    ## Context
-    Recent changes were made to fix UX issues. You need to verify the codebase is healthy.
-
-    ## Your Task
-
-    1. **Run the test suite:**
-       ```bash
-       # Detect and run appropriate test command
-       npm test          # or yarn test, pnpm test
-       ```
-
-    2. **If tests fail:**
-       - Analyze the failing tests
-       - Determine if failures are related to recent changes
-       - Fix the broken tests or update them to reflect new behavior
-       - Re-run tests until all pass
-       - Document what tests were updated and why
-
-    3. **Run linting and type checking:**
-       ```bash
-       npm run lint      # or eslint, prettier
-       npm run typecheck # or tsc --noEmit
-       ```
-
-    4. **Run end-to-end tests locally:**
-       ```bash
-       npm run test:e2e      # common convention
-       npx playwright test   # Playwright
-       npx cypress run       # Cypress
-       ```
-
-    5. **If E2E tests fail:**
-       - Analyze the failures (may be related to UI changes)
-       - Update E2E tests to reflect new UI behavior
-       - Re-run until all pass
-       - Document what E2E tests were updated
-
-    6. **Return verification results:**
-    ```
-    ## Local Verification Results
-
-    ### Test Results
-    - Unit tests: ✓/✗ [count] passed, [count] failed
-    - Lint: ✓/✗ [errors if any]
-    - Type check: ✓/✗ [errors if any]
-    - E2E tests: ✓/✗ [count] passed, [count] failed
-
-    ### Tests Updated
-    - [test file 1]: [why updated]
-    - [test file 2]: [why updated]
-
-    ### Status: PASS / FAIL
-    [If FAIL, explain what's still broken]
-    ```
-```
-
-**After agent returns:**
-```
-TaskUpdate:
-- taskId: [verification task ID]
-- status: "completed"
-- metadata: {
-    "result": "PASS" or "FAIL",
-    "unitTests": {"passed": N, "failed": N},
-    "e2eTests": {"passed": N, "failed": N},
-    "lint": "pass" or "fail",
-    "typecheck": "pass" or "fail"
-  }
-```
-
-- If PASS: Proceed to report generation
-- If FAIL: Review failures with user, spawn another agent to fix remaining issues
-
-### Phase 10: Generate HTML Report [DELEGATE TO AGENT]
-
-**Create report generation task:**
-```
-TaskCreate:
-- subject: "Generate: HTML Report"
-- description: "Generate HTML report with before/after screenshot comparisons"
-- activeForm: "Generating HTML report"
-
-TaskUpdate:
-- taskId: [html report task ID]
-- status: "in_progress"
-```
-
-**Use the Task tool to generate the HTML report:**
-
-```
-Task tool parameters:
-- subagent_type: "general-purpose"
-- model: "haiku" (simple generation task)
-- prompt: |
-    Generate an HTML report for browser UX compliance fixes.
-
-    ## Data to Include
-
-    **App Name:** [App name]
-    **Date:** [Current date]
-    **Issues Fixed:** [Count]
-    **Issues Remaining:** [Count]
-
-    **Fixes Made:**
-    [For each fix:]
-    - Issue: [Name]
-    - Before screenshot: workflows/screenshots/{workflow}/before/{file}.png
-    - After screenshot: workflows/screenshots/{workflow}/after/{file}.png
-    - Files changed: [List]
-    - Why it matters: [Explanation]
-
-    ## Output
-
-    Write the HTML report to: workflows/browser-changes-report.html
-
-    Use this template structure:
-    - Executive summary with stats
-    - Before/after screenshot comparisons for each fix
-    - Files changed section
-    - "Why this matters" explanations
-
-    Style: Clean, professional, uses system fonts, responsive grid for screenshots.
-
-    Return confirmation when complete.
-```
-
-**After agent completes:**
-```
-TaskUpdate:
-- taskId: [html report task ID]
-- status: "completed"
-- metadata: {"outputPath": "workflows/browser-changes-report.html"}
-```
-
-### Phase 11: Generate Markdown Report [DELEGATE TO AGENT]
-
-**Create markdown report task:**
-```
-TaskCreate:
-- subject: "Generate: Markdown Report"
-- description: "Generate Markdown documentation for fixes"
-- activeForm: "Generating Markdown report"
-
-TaskUpdate:
-- taskId: [md report task ID]
-- status: "in_progress"
-```
-
-**Use the Task tool to generate the Markdown report:**
-
-```
-Task tool parameters:
-- subagent_type: "general-purpose"
-- model: "haiku"
-- prompt: |
-    Generate a Markdown report for browser UX compliance fixes.
-
-    ## Data to Include
-    [Same data as HTML report]
-
-    ## Output
-
-    Write the Markdown report to: workflows/browser-changes-documentation.md
-
-    Include:
-    - Executive summary
-    - Before/after comparison table
-    - Detailed changes for each fix
-    - Files changed
-    - Technical implementation notes
-    - Testing verification results
-
-    Return confirmation when complete.
-```
-
-**After agent completes:**
-```
-TaskUpdate:
-- taskId: [md report task ID]
-- status: "completed"
-- metadata: {"outputPath": "workflows/browser-changes-documentation.md"}
-```
+See [references/report-generation.md](references/report-generation.md) for the full report generation agent prompts.
 
 ### Phase 12: Create PR and Monitor CI
 
-**Create PR task:**
-```
-TaskCreate:
-- subject: "Create: Pull Request"
-- description: |
-    Create PR for browser UX compliance fixes.
-    Fixes included: [list from completed fix tasks]
-    Files modified: [aggregated from fix task metadata]
-- activeForm: "Creating pull request"
+Only after local verification passes:
 
-TaskUpdate:
-- taskId: [pr task ID]
-- status: "in_progress"
-```
-
-**Only after local verification passes**, create the PR:
-
-1. **Create a feature branch:**
-   ```bash
-   git checkout -b fix/browser-ux-compliance
-   ```
-
-2. **Stage and commit changes:**
-   ```bash
-   git add .
-   git commit -m "fix: browser UX compliance improvements
-
-   - [List key fixes made]
-   - Updated tests to reflect new behavior
-   - All local tests passing"
-   ```
-
-3. **Push and create PR:**
-   ```bash
-   git push -u origin fix/browser-ux-compliance
-   gh pr create --title "fix: Browser UX compliance improvements" --body "## Summary
-   [Brief description of fixes]
-
-   ## Changes
-   - [List of changes]
-
-   ## Testing
-   - [x] All unit tests pass locally
-   - [x] All E2E tests pass locally
-   - [x] Manual verification complete
-
-   ## Screenshots
-   See workflows/browser-changes-report.html for before/after comparisons"
-   ```
-
-4. **Monitor CI:**
-   - Watch for CI workflow to start
-   - If CI fails, analyze the failure
-   - Fix any CI-specific issues (environment differences, flaky tests)
-   - Push fixes and re-run CI
-   - Do not merge until CI is green
-
-5. **Update PR task with status:**
-   ```
-   TaskUpdate:
-   - taskId: [pr task ID]
-   - metadata: {
-       "prUrl": "https://github.com/owner/repo/pull/123",
-       "ciStatus": "running" | "passed" | "failed"
-     }
-   ```
-
-   When CI completes:
-   ```
-   TaskUpdate:
-   - taskId: [pr task ID]
-   - status: "completed"
-   - metadata: {"prUrl": "...", "ciStatus": "passed", "merged": false}
-   ```
-
-6. **Report PR status to user:**
-   ```
-   PR created: https://github.com/owner/repo/pull/123
-   CI status: Running... (or Passed/Failed)
-   ```
-
-7. **Final session summary from tasks:**
-   ```
-   Call TaskList to generate final summary:
-
-   ## Session Complete
-
-   **Workflows Executed:** [count completed workflow tasks]
-   **Issues Found:** [count issue tasks]
-   **Issues Fixed:** [count completed fix tasks]
-   **Tests:** [from verification task metadata]
-   **PR:** [from pr task metadata]
-
-   All tasks completed successfully.
-   ```
-
-## MCP Tool Reference
-
-**Navigation:**
-- `navigate({ url, tabId })` - Go to URL
-
-**Finding Elements:**
-- `find({ query, tabId })` - Natural language search, returns refs
-- `read_page({ tabId, filter: 'interactive' })` - Get all interactive elements
-
-**Interactions:**
-- `computer({ action: 'left_click', coordinate: [x, y], tabId })`
-- `computer({ action: 'left_click', ref: 'ref_1', tabId })` - Click by reference
-- `computer({ action: 'type', text: '...', tabId })`
-- `computer({ action: 'scroll', scroll_direction: 'down', coordinate: [x, y], tabId })`
-- `computer({ action: 'left_click_drag', start_coordinate: [x1, y1], coordinate: [x2, y2], tabId })`
-- `computer({ action: 'wait', duration: 2, tabId })`
-
-**Screenshots:**
-- `computer({ action: 'screenshot', tabId })` - Capture current state
-
-**Inspection:**
-- `get_page_text({ tabId })` - Extract text content
-- `read_console_messages({ tabId, pattern: 'error' })` - Check for errors
-- `read_network_requests({ tabId })` - Check API calls
-
-**Forms:**
-- `form_input({ ref, value, tabId })` - Set form field value
-
-## Known Limitations
-
-The Claude-in-Chrome browser automation has the following limitations that cannot be automated:
-
-### Cannot Automate (Must Skip or Flag for Manual Testing)
-
-1. **Keyboard Shortcuts**
-   - System-level shortcuts (Cmd+Z, Cmd+C, Cmd+V, etc.) may cause extension disconnection
-   - Browser shortcuts that trigger native behavior can interrupt the session
-   - **Workaround:** Use UI buttons instead of keyboard shortcuts when available
-
-2. **Native Browser Dialogs**
-   - `alert()`, `confirm()`, `prompt()` dialogs block all browser events
-   - File upload dialogs (OS-level file picker)
-   - Print dialogs
-   - **Workaround:** Skip steps requiring these, or flag for manual testing
-
-3. **Pop-ups and New Windows**
-   - Pop-ups that open in new windows outside the MCP tab group
-   - OAuth flows that redirect to external authentication pages
-   - **Workaround:** Document as requiring manual verification
-
-4. **System-Level Interactions**
-   - Browser permission prompts (camera, microphone, notifications, location)
-   - Download dialogs and download management
-   - Browser settings and preferences pages
-   - **Workaround:** Pre-configure permissions or skip these steps
-
-### Handling Limited Steps
-
-When a workflow step involves a known limitation:
-
-1. **Mark as [MANUAL]:** Note the step requires manual verification
-2. **Try UI Alternative:** If testing "Press Cmd+Z to undo", look for an Undo button instead
-3. **Document the Limitation:** Record in findings that the step was skipped due to automation limits
-4. **Continue Testing:** Don't let one limited step block the entire workflow
+1. Create feature branch `fix/browser-ux-compliance`
+2. Stage, commit, and push changes
+3. Create PR via `gh pr create` with summary, changes list, testing checklist, and screenshot references
+4. Monitor CI -- fix failures, re-run until green
+5. Report PR status and final session summary from task metadata
 
 ## Guidelines
 
@@ -904,9 +133,10 @@ When a workflow step involves a known limitation:
 - **Be observant:** Note anything unusual, even if the step "passes"
 - **Be thorough:** Check console for errors, look for visual glitches
 - **Be constructive:** Frame issues as opportunities for improvement
-- **Ask if stuck:** If a step is ambiguous or fails, ask the user for guidance
-- **Prefer clicks over keys:** Always use UI buttons instead of keyboard shortcuts when possible
-- **Delegate to agents:** Use agents for research, fixing, verification, and report generation to save context
+- **Prefer clicks over keys:** Always use UI buttons instead of keyboard shortcuts
+- **Delegate to agents:** Use agents for research, fixing, verification, and report generation
+
+See [references/automation-limitations.md](references/automation-limitations.md) for known limitations and workarounds.
 
 ## Handling Failures
 
@@ -914,49 +144,22 @@ If a step fails:
 1. Take a screenshot of the failure state
 2. Check console for errors (`read_console_messages`)
 3. Note what went wrong
-4. Ask the user: continue with next step, retry, or abort?
+4. Ask the user: continue, retry, or abort?
 
 Do not silently skip failed steps.
 
 ## Session Recovery
 
-If resuming from an interrupted session:
+**Primary method:** Call TaskList to check workflow, issue, and fix task states.
 
-**Primary method: Use task list (preferred)**
-1. Call `TaskList` to get all existing tasks
-2. Check for workflow tasks with status `in_progress` or `pending`
-3. Check for issue tasks to understand what was found
-4. Check for fix tasks to see what fixes were attempted
-5. Resume from the appropriate point based on task states
+| TaskList State | Resume Action |
+|---|---|
+| All workflow tasks completed, no fix tasks | Ask user: "Audit complete. Fix issues?" |
+| All workflows done, fix tasks in_progress | Resume fix mode |
+| Some workflow tasks pending | Resume from first pending workflow |
+| Workflow task in_progress | Read findings file, resume from next step |
+| No tasks exist | Fresh start (Phase 1) |
 
-**Recovery decision tree:**
-```
-TaskList shows:
-├── All workflow tasks completed, no fix tasks
-│   └── Ask user: "Audit complete. Want to fix issues?"
-├── All workflow tasks completed, fix tasks in_progress
-│   └── Resume fix mode, check agent status
-├── Some workflow tasks pending
-│   └── Resume from first pending workflow
-├── Workflow task in_progress
-│   └── Read findings file to see which steps completed
-│       └── Resume from next step in that workflow
-└── No tasks exist
-    └── Fresh start (Phase 1)
-```
+**Fallback:** Read `.claude/plans/browser-workflow-findings.md` to determine which workflows completed, recreate tasks for remaining ones.
 
-**Fallback method: Use findings file**
-1. Read `.claude/plans/browser-workflow-findings.md` to see which workflows have been completed
-2. Resume from the next uncompleted workflow
-3. Recreate tasks for remaining workflows
-
-**Always inform user:**
-```
-Resuming from interrupted session:
-- Workflows completed: [list from completed tasks]
-- Issues found: [count from issue tasks]
-- Current state: [in_progress task description]
-- Resuming: [next action]
-```
-
-Do not re-execute already-passed workflows unless the user specifically requests it.
+Always inform user when resuming: completed workflows, issues found, current state, next action. Do not re-execute passed workflows unless specifically requested.
