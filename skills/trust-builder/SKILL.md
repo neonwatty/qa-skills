@@ -47,7 +47,7 @@ Create main task and mark in_progress. Create Interview task.
 1. Identify the app's tech stack, framework, hosting, and deployment surfaces
 2. Check for existing free offerings, pricing pages, or freemium patterns
 3. Ask the user for the app's **base URL** for live browser exploration. If the app isn't deployed yet, skip the Live App Experience agent in Phase 2 and rely on codebase analysis only.
-4. Ask the user targeted questions via AskUserQuestion (see [references/interview-questions.md](references/interview-questions.md) for the full question set):
+4. **Read [references/interview-questions.md](references/interview-questions.md) now.** Ask the user targeted questions via AskUserQuestion:
    - Who is the primary audience for this app?
    - What's the current or planned monetization model?
    - What does "trust" mean for your users? (e.g., privacy, accuracy, reliability, transparency)
@@ -73,7 +73,7 @@ After all agents return, synthesize into a **trust opportunity map** — unified
 
 ### Phase 3: Generate & Prioritize Opportunities
 
-Create Generate task and mark in_progress.
+Create Generate task and mark in_progress. **Read [references/trust-patterns.md](references/trust-patterns.md) now** — use these proven patterns to inspire opportunity generation.
 
 For each promising opportunity from the trust opportunity map, generate a mini-spec with 6 fields:
 
@@ -95,7 +95,7 @@ Then assign each opportunity to a priority tier:
 
 ### Phase 4: Competitive Verification (Optional — based on Phase 1 preference)
 
-If the user opted into competitive verification in Phase 1, spawn a browser agent to:
+If the user opted into competitive verification in Phase 1, **read [references/verification-prompts.md](references/verification-prompts.md)** and spawn a browser agent to:
 
 1. Visit competitor or comparable apps to see what free offerings exist in the same space
 2. Validate that proposed free features don't already exist elsewhere (avoiding "me too" offerings)
@@ -110,6 +110,8 @@ Use AskUserQuestion with options: **Approve** / **Deep-dive on specific opportun
 If changes requested, iterate. Only write final report after explicit approval.
 
 ### Phase 6: Write Report and Complete
+
+**Read [references/report-structure.md](references/report-structure.md) and [examples/trust-builder-example.md](examples/trust-builder-example.md) now** — follow the template exactly and match the example's depth.
 
 Write the approved report to `/reports/trust-builder-audit.md`. Mark all tasks completed.
 
@@ -136,10 +138,14 @@ Write the approved report to `/reports/trust-builder-audit.md`. Mark all tasks c
 
 ## Reference Materials
 
-- [references/agent-prompts.md](references/agent-prompts.md) — Full prompts for Phase 2 exploration agents
-- [references/technology-catalog.md](references/technology-catalog.md) — Curated catalog of free-value-capable technologies
-- [references/interview-questions.md](references/interview-questions.md) — Structured interview questions for Phase 1
-- [references/verification-prompts.md](references/verification-prompts.md) — Competitive verification agent prompt
-- [references/report-structure.md](references/report-structure.md) — Full report template with section descriptions
-- [references/trust-patterns.md](references/trust-patterns.md) — Proven trust-building patterns with real-world examples
-- [examples/trust-builder-example.md](examples/trust-builder-example.md) — Complete example report
+Load these files **only when you reach the phase that needs them** — not all at once.
+
+| Phase | File | What it provides |
+|-------|------|-----------------|
+| Phase 1 | [references/interview-questions.md](references/interview-questions.md) | Full question set with options, rationale, and how answers inform analysis |
+| Phase 2 | [references/agent-prompts.md](references/agent-prompts.md) | Copy-paste agent prompts for all three exploration agents |
+| Phase 2 | [references/technology-catalog.md](references/technology-catalog.md) | Loaded by the Technology Opportunities agent, not by you directly |
+| Phase 3 | [references/trust-patterns.md](references/trust-patterns.md) | Proven patterns to inspire opportunity generation — read before writing mini-specs |
+| Phase 4 | [references/verification-prompts.md](references/verification-prompts.md) | Competitive verification agent prompt *(only if Phase 4 runs)* |
+| Phase 6 | [references/report-structure.md](references/report-structure.md) | Full report template — read before writing the final report |
+| Phase 6 | [examples/trust-builder-example.md](examples/trust-builder-example.md) | Complete example report showing expected output quality |
