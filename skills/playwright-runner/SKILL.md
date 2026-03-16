@@ -439,7 +439,7 @@ This table maps workflow natural language to Playwright MCP tool calls. This is 
 
 | Workflow Language | Playwright MCP Tool Call |
 |---|---|
-| Navigate to [URL] | `browser_navigate` url="[base_url][URL]" |
+| Navigate to \[URL\] | `browser_navigate` url="\[base_url\]\[URL\]" |
 | Navigate to the [page name] page | `browser_navigate` url="[base_url]/[inferred-route]" |
 | Go back to the previous page | `browser_navigate_back` |
 | Refresh the page | `browser_evaluate` function="() => location.reload()" |

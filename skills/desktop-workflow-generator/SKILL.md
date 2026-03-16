@@ -607,7 +607,7 @@ Example output for the step above:
 
 When assembling workflows in Phase 6, wrap each journey's confirmed steps in this template:
 
-~~~markdown
+````markdown
 ## Workflow [N]: [Journey Name]
 <!-- auth: required/no -->
 <!-- priority: core/feature/edge -->
@@ -623,7 +623,7 @@ When assembling workflows in Phase 6, wrap each journey's confirmed steps in thi
 
 **Postconditions:**
 - [Final expected state after all steps complete]
-~~~
+````
 
 ### After Each Journey Completes
 
