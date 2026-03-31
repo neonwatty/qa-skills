@@ -197,16 +197,53 @@ What is the base URL of the running app?
 
 Check for `.playwright/profiles.json` at the project root.
 
-**If profiles exist:** Read them and verify storageState files are present. Report which profiles are available.
+**If profiles exist:** Read them, verify storageState files are present, and resolve which profile each agent should use. This decision happens HERE, not inside each agent.
 
-**If profiles do not exist and auth-required screens are in the manifest:** Inform the user:
+```
+Found [N] authentication profiles:
+
+| Profile | Description | storageState |
+|---------|-------------|--------------|
+| admin   | Full admin permissions | ✓ Valid |
+| user    | Standard user account | ✓ Valid |
+| viewer  | Read-only access | ✗ Missing |
+```
+
+Then determine the profile assignment:
+
+- If only one profile exists, assign it to all agents automatically.
+- If multiple profiles exist, ask the user which profile each agent type should use:
+
+```
+Multiple profiles are available. Which profile should each agent use?
+
+For smoke-tester: [admin / user / viewer]
+For ux-auditor: [admin / user / viewer]
+For adversarial-breaker: [admin / user / viewer, or "all" to test each role]
+
+Default: Use "user" for smoke and UX, "all" for adversarial.
+Accept defaults? (yes / customize)
+```
+
+The adversarial-breaker benefits from testing with multiple profiles (and unauthenticated) to find auth boundary issues. The smoke-tester and ux-auditor typically need one consistent profile.
+
+Record the profile assignment — it will be passed to each agent in the dispatch template.
+
+**If profiles exist but some storageState files are missing:**
+
+```
+Profile "viewer" is configured but its auth state is missing (gitignored).
+Run /setup-profiles to refresh it, or proceed without it.
+```
+
+**If profiles do not exist and auth-required screens are in the manifest:**
 
 ```
 [N] screens in the manifest require authentication, but no profiles are set up.
 
 1. Run /setup-profiles now to create auth profiles (recommended)
 2. Skip auth-required screens
-3. Proceed anyway (agents will handle auth individually)
+3. Proceed anyway (agents will attempt to handle auth individually)
 ```
 
 If the user chooses option 1, pause the QA run and let them complete profile setup. Resume when they return.
@@ -251,22 +288,49 @@ For each screen in the manifest, spawn the selected agent(s) using the Agent too
 
 ### Agent Spawn Template
 
-For each dispatch, use the Agent tool with this prompt pattern:
+For each dispatch, use the Agent tool with this prompt pattern. The profile assignment is resolved — pass the specific profile name (from Phase 3b) to each agent so it does not need to make its own selection decision.
 
 ```
 You are operating as the [agent-name] QA agent.
 
 Target: [screen name] at [base_url][url_path]
 Auth required: [yes/no]
-Auth profile: [profile name from .playwright/profiles.json, if applicable]
+Auth profile to use: [exact profile name, e.g., "admin"]
+Auth profile path: .playwright/profiles/[profile-name].json
 Related workflows: [workflow refs, if any]
+
+To load the auth profile, read the storageState file and run:
+
+  async (page) => {
+    const state = <contents of .playwright/profiles/[profile-name].json>;
+    await page.context().addCookies(state.cookies);
+    return 'Profile loaded: [profile-name]';
+  }
+
+After loading, navigate to [full_url]. If you are redirected to
+[loginUrl from profiles.json], the session has expired — report this
+and stop.
 
 [Include the full system prompt from the agent definition]
 
 Base URL: [base_url]
 Screen URL: [full_url]
 
-Begin your audit now. When complete, return your findings in the output format specified in your system prompt.
+Begin your audit now. When complete, return your findings in the output
+format specified in your system prompt.
+```
+
+For the **adversarial-breaker**, if the user selected "all" profiles in Phase 3b, dispatch the agent with ALL profile names and instruct it to test with each profile as well as unauthenticated:
+
+```
+Auth profiles to test:
+- admin: .playwright/profiles/admin.json
+- user: .playwright/profiles/user.json
+- (unauthenticated): do not load any profile
+
+Test auth boundaries by switching between these profiles and the
+unauthenticated state. Check whether admin-only screens are accessible
+with the "user" profile or unauthenticated.
 ```
 
 ### Parallel Dispatch

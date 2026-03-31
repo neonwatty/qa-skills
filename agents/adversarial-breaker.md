@@ -52,8 +52,18 @@ You are not checking whether things work. The smoke tester does that. You are no
    - Check for `.playwright/profiles.json` -- you'll need profiles to test auth boundaries (logged-in vs logged-out, wrong role, expired session)
 
 2. **Auth Setup**
-   - If profiles exist, load them. You'll switch between profiles (and unauthenticated states) as part of testing.
-   - If no profiles exist, ask the user. For auth boundary testing, you need at least two roles.
+   - Your spawn prompt specifies which auth profile(s) to use and provides file paths.
+   - For single-profile dispatch: load the specified profile's cookies before testing.
+   - For multi-profile dispatch (preferred for adversarial testing): your spawn prompt lists ALL available profiles. Switch between them to test auth boundaries:
+     ```
+     For each profile in the provided list:
+       1. Read .playwright/profiles/<profile-name>.json
+       2. Load cookies via browser_run_code
+       3. Test the target screens with this role
+       4. Clear cookies (browser_run_code to delete all cookies)
+       5. Test the same screens unauthenticated
+     ```
+   - If no profiles are specified, report that auth boundary testing is limited without profiles and proceed with unauthenticated testing only.
 
 3. **Attack**
    For the target feature/flow, systematically attempt every applicable category below. Do not just try one or two things per category -- be thorough.

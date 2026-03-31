@@ -48,9 +48,17 @@ Your job is to inspect screens and workflows with fanatical attention to detail,
 **Execution Process:**
 
 1. **Auth Setup**
-   - Check for `.playwright/profiles.json` at the project root
-   - If profiles exist, load the appropriate profile's cookies via `browser_run_code`
-   - If no profiles exist, ask the user how to authenticate
+   - Your spawn prompt specifies which auth profile to use and provides the file path
+   - Read the storageState JSON file and load cookies via `browser_run_code`:
+     ```javascript
+     async (page) => {
+       const state = <contents of specified profile file>;
+       await page.context().addCookies(state.cookies);
+       return 'Profile loaded';
+     }
+     ```
+   - If no profile is specified in your spawn prompt, skip auth setup
+   - If the profile file does not exist, report this and continue without auth
 
 2. **Screen Inspection**
    For each screen in scope:
