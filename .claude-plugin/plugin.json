@@ -17,8 +17,6 @@
     "authentication",
     "ci"
   ],
-  "agents": "./agents",
-  "commands": "./commands",
   "skills": "./skills",
   "repository": "https://github.com/neonwatty/qa-skills"
 }

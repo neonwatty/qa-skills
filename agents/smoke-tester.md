@@ -1,8 +1,6 @@
 ---
 name: smoke-tester
 description: Quick functional check of app workflows via Playwright. Walks through steps, verifies each passes, produces pass/fail report.
-model: inherit
-color: green
 ---
 
 <example>

@@ -1,8 +1,6 @@
 ---
 name: ux-auditor
 description: Thorough UX quality check of screens or workflows. Applies comprehensive rubric to spacing, states, copy, accessibility, consistency, and interactions.
-model: inherit
-color: yellow
 ---
 
 <example>

@@ -1,8 +1,6 @@
 ---
 name: adversarial-breaker
 description: Actively tries to break the app — wrong inputs, unexpected sequences, auth bypasses, race conditions, state corruption. Finds edge cases and vulnerabilities.
-model: inherit
-color: red
 ---
 
 <example>
