@@ -6,6 +6,28 @@ set -e
 SKILLS_DIR="skills"
 ERRORS=0
 
+# Extract YAML frontmatter (between --- delimiters) and parse it.
+# Catches invalid YAML that grep-based checks miss (e.g. <example> blocks
+# or unquoted colons inside the frontmatter section).
+validate_frontmatter_yaml() {
+    local file="$1"
+    local frontmatter
+    frontmatter=$(awk 'BEGIN{found=0} /^---$/{found++; if(found==2) exit; next} found==1{print}' "$file")
+
+    if [[ -z "$frontmatter" ]]; then
+        return 1
+    fi
+
+    echo "$frontmatter" | python3 -c "
+import sys, yaml
+try:
+    yaml.safe_load(sys.stdin.read())
+except yaml.YAMLError as e:
+    print(f'  YAML parse error: {e}')
+    sys.exit(1)
+" 2>&1
+}
+
 echo "Validating skill files..."
 echo ""
 
@@ -50,6 +72,12 @@ for skill_dir in "$SKILLS_DIR"/*/; do
     # Check for at least one H2 section
     if ! grep -q "^## " "$skill_file"; then
         echo "  ⚠️  Warning: No ## sections found"
+    fi
+
+    # Parse YAML frontmatter to catch syntax errors
+    if ! validate_frontmatter_yaml "$skill_file"; then
+        echo "  ❌ Invalid YAML in frontmatter"
+        ERRORS=$((ERRORS + 1))
     fi
 
     # Check that name in frontmatter matches directory name
@@ -98,6 +126,12 @@ if [[ -d "$AGENTS_DIR" ]]; then
             ERRORS=$((ERRORS + 1))
         fi
 
+        # Parse YAML frontmatter to catch syntax errors
+        if ! validate_frontmatter_yaml "$agent_file"; then
+            echo "  ❌ Invalid YAML in frontmatter"
+            ERRORS=$((ERRORS + 1))
+        fi
+
         # Check that name in frontmatter matches filename
         frontmatter_name=$(head -20 "$agent_file" | grep "^name:" | sed 's/name:[[:space:]]*//')
         if [[ "$frontmatter_name" != "$agent_name" ]]; then
@@ -139,6 +173,12 @@ if [[ -d "$COMMANDS_DIR" ]]; then
         frontmatter_close=$(head -20 "$cmd_file" | tail -n +2 | grep -n "^---" | head -1 | cut -d: -f1)
         if [[ -z "$frontmatter_close" ]]; then
             echo "  ❌ Missing closing frontmatter delimiter (---)"
+            ERRORS=$((ERRORS + 1))
+        fi
+
+        # Parse YAML frontmatter to catch syntax errors
+        if ! validate_frontmatter_yaml "$cmd_file"; then
+            echo "  ❌ Invalid YAML in frontmatter"
             ERRORS=$((ERRORS + 1))
         fi
 
