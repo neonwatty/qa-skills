@@ -8,10 +8,16 @@ set -euo pipefail
 # and scoring results.
 #
 # Usage:
-#   ./eval/harness/eval.sh [--stage gen|validate|run|convert|all] \
-#                          [--platform desktop|mobile|multi-user|all]
+#   ./eval/harness/eval.sh [--stage gen|validate|run|convert|score-only|all] \
+#                          [--platform desktop|mobile|multi-user|all] \
+#                          [--workflows-dir PATH]
 #
 # Defaults: --stage all --platform desktop
+#
+# score-only mode:
+#   Skips the dev server, gen, run, and convert stages. Expects workflows to
+#   already exist in --workflows-dir (default: eval/reference-app/workflows).
+#   Validates, scores, persists, and reports.
 ###############################################################################
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -28,14 +34,15 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --stage) STAGE="$2"; shift 2;;
     --platform) PLATFORM="$2"; shift 2;;
+    --workflows-dir) WORKFLOWS_DIR="$2"; shift 2;;
     *) echo "Unknown arg: $1"; exit 1;;
   esac
 done
 
 # Validate args
 case "$STAGE" in
-  gen|validate|run|convert|all) ;;
-  *) echo "Invalid stage: $STAGE (expected gen|validate|run|convert|all)"; exit 1;;
+  gen|validate|run|convert|score-only|all) ;;
+  *) echo "Invalid stage: $STAGE (expected gen|validate|run|convert|score-only|all)"; exit 1;;
 esac
 
 case "$PLATFORM" in
@@ -60,29 +67,36 @@ cleanup() {
 trap cleanup EXIT
 
 ###############################################################################
-# Step 1: Start reference app
+# Step 1: Start reference app (skip for score-only)
 ###############################################################################
-echo "=============================================="
-echo "  Starting reference app on port 4100..."
-echo "=============================================="
+if [[ "$STAGE" != "score-only" ]]; then
+  echo "=============================================="
+  echo "  Starting reference app on port 4100..."
+  echo "=============================================="
 
-cd "$REF_APP_DIR" && npm run dev -- -p 4100 &
-DEV_SERVER_PID=$!
-cd "$REPO_ROOT"
+  cd "$REF_APP_DIR" && npm run dev -- -p 4100 &
+  DEV_SERVER_PID=$!
+  cd "$REPO_ROOT"
 
-# Poll until the app responds (max 30s)
-WAIT_MAX=30
-WAIT_COUNT=0
-echo "[startup] Waiting for http://localhost:4100/login ..."
-while ! curl -s -o /dev/null -w '' http://localhost:4100/login 2>/dev/null; do
-  WAIT_COUNT=$((WAIT_COUNT + 1))
-  if [[ $WAIT_COUNT -ge $WAIT_MAX ]]; then
-    echo "[startup] FAIL — app did not respond within ${WAIT_MAX}s"
-    exit 1
-  fi
-  sleep 1
-done
-echo "[startup] Reference app is running (took ${WAIT_COUNT}s)"
+  # Poll until the app responds (max 30s)
+  WAIT_MAX=30
+  WAIT_COUNT=0
+  echo "[startup] Waiting for http://localhost:4100/login ..."
+  while ! curl -s -o /dev/null -w '' http://localhost:4100/login 2>/dev/null; do
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+    if [[ $WAIT_COUNT -ge $WAIT_MAX ]]; then
+      echo "[startup] FAIL — app did not respond within ${WAIT_MAX}s"
+      exit 1
+    fi
+    sleep 1
+  done
+  echo "[startup] Reference app is running (took ${WAIT_COUNT}s)"
+else
+  echo "=============================================="
+  echo "  score-only mode — skipping dev server"
+  echo "=============================================="
+  echo "[startup] Using existing workflows in: $WORKFLOWS_DIR"
+fi
 
 ###############################################################################
 # Step 2: Generator stage (PLACEHOLDER)
@@ -107,7 +121,7 @@ fi
 ###############################################################################
 VALIDATE_OUTPUT_FILE="$(mktemp)"
 VALIDATE_EXIT=0
-if [[ "$STAGE" == "validate" || "$STAGE" == "all" ]]; then
+if [[ "$STAGE" == "validate" || "$STAGE" == "score-only" || "$STAGE" == "all" ]]; then
   echo ""
   echo "=============================================="
   echo "  Stage: validate"
@@ -141,7 +155,7 @@ if [[ "$STAGE" == "validate" || "$STAGE" == "all" ]]; then
 fi
 
 ###############################################################################
-# Step 4: Runner stage (PLACEHOLDER)
+# Step 4: Runner stage (PLACEHOLDER) — skip for score-only
 ###############################################################################
 if [[ "$STAGE" == "run" || "$STAGE" == "all" ]]; then
   echo ""
@@ -153,7 +167,7 @@ if [[ "$STAGE" == "run" || "$STAGE" == "all" ]]; then
 fi
 
 ###############################################################################
-# Step 5: Converter stage (PLACEHOLDER)
+# Step 5: Converter stage (PLACEHOLDER) — skip for score-only
 ###############################################################################
 if [[ "$STAGE" == "convert" || "$STAGE" == "all" ]]; then
   echo ""

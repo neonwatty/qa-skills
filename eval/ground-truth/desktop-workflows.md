@@ -17,6 +17,11 @@
 | 6 | User Management | feature | required | 5 |
 | 7 | Empty Project State | edge | required | 3 |
 | 8 | Login with Invalid Credentials | edge | no | 5 |
+| 9 | User Registration | core | no | 7 |
+| 10 | Edit Profile | feature | required | 6 |
+| 11 | Invite New User (Admin) | feature | required | 6 |
+| 12 | View Notifications | feature | required | 6 |
+| 13 | Direct Task Navigation | edge | required | 4 |
 
 ---
 
@@ -204,6 +209,116 @@
 **Postconditions:**
 - The user remains on the login page
 - An error message displays "Invalid credentials"
+
+## Workflow 9: User Registration
+
+<!-- auth: no -->
+<!-- priority: core -->
+<!-- estimated-steps: 7 -->
+
+**Preconditions:**
+- No existing account with email "newuser@taskflow.com"
+
+1. Navigate to /register — the registration page
+2. Verify the heading displays "Create Account" — confirms navigation to registration
+3. Type "New User" in the "Name" field — enter the user's full name
+4. Type "newuser@taskflow.com" in the "Email" field — enter the user's email
+5. Type "securePass456" in the "Password" field — enter the user's password
+6. Click the "Create Account" button — submit the registration form
+7. Verify the dashboard heading displays "Welcome, New User" — confirms successful registration and redirect to dashboard
+
+**Postconditions:**
+- A new user account exists with email "newuser@taskflow.com"
+- The user is authenticated and on the dashboard page
+
+---
+
+## Workflow 10: Edit Profile
+
+<!-- auth: required -->
+<!-- priority: feature -->
+<!-- estimated-steps: 6 -->
+
+**Preconditions:**
+- User is logged in as admin
+
+1. Navigate to /profile — the user profile page
+2. Verify the "Name" field displays "Admin User" — confirms current name is loaded
+3. Clear the "Name" field — remove the existing name
+4. Type "Admin Updated" in the "Name" field — enter the new display name
+5. Click the "Save" button — submit the profile changes
+6. Verify the heading displays "Admin Updated" — confirms the profile name was updated successfully
+
+**Postconditions:**
+- The user's display name has been changed to "Admin Updated"
+- The profile page reflects the updated name
+
+---
+
+## Workflow 11: Invite New User (Admin)
+
+<!-- auth: required -->
+<!-- priority: feature -->
+<!-- estimated-steps: 6 -->
+
+**Preconditions:**
+- User is logged in as admin
+- No existing invitation for "invitee@taskflow.com"
+
+1. Navigate to /invite — the invite user page
+2. Verify the heading displays "Invite New User" — confirms navigation to invite page
+3. Type "invitee@taskflow.com" in the "Email" field — enter the invitee's email address
+4. Click the "Send Invite" button — submit the invitation
+5. Verify the success message displays "Invitation sent to invitee@taskflow.com" — confirms the invite was sent
+6. Verify the credentials section contains "Temporary password" — confirms temporary credentials were generated
+
+**Postconditions:**
+- An invitation has been sent to "invitee@taskflow.com"
+- Temporary credentials are displayed for the admin to share
+
+---
+
+## Workflow 12: View Notifications
+
+<!-- auth: required -->
+<!-- priority: feature -->
+<!-- estimated-steps: 6 -->
+
+**Preconditions:**
+- User is logged in as member (member@taskflow.com / password123)
+- A seeded notification "Admin assigned you" exists for the member
+
+1. Navigate to /notifications — the notifications page
+2. Verify the heading displays "Notifications" — confirms navigation to notifications page
+3. Verify the notification list contains "Admin assigned you" — confirms the seeded notification is visible
+4. Click the "Mark as Read" button — mark the notification as read
+5. Verify the notification "Admin assigned you" displays "read" status — confirms the notification was marked as read
+6. Verify the unread count displays "0" — confirms no unread notifications remain
+
+**Postconditions:**
+- The notification "Admin assigned you" is marked as read
+- The unread notification count is zero
+
+---
+
+## Workflow 13: Direct Task Navigation
+
+<!-- auth: required -->
+<!-- priority: edge -->
+<!-- estimated-steps: 4 -->
+
+**Preconditions:**
+- User is logged in as admin
+- Task 1 ("Set up authentication") exists with status "done" and has comments
+
+1. Navigate to /tasks/1 — directly access the task detail page via URL
+2. Verify the heading displays "Set up authentication" — confirms the correct task loaded
+3. Verify the status badge contains "done" — confirms the task status is shown correctly
+4. Verify the comments section contains "Looks good, merging now" — confirms comments are listed on the task detail page
+
+**Postconditions:**
+- The task detail page for "Set up authentication" is displayed
+- Task status, heading, and comments are all visible
 
 ---
 
