@@ -48,6 +48,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Ensure PyYAML is available for frontmatter validation
+        run: python3 -c "import yaml" || pip install pyyaml
+
       - name: Lint markdown files
         run: npm run validate:md
 
