@@ -22,8 +22,11 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Validate plugin schema
+      - name: Validate marketplace manifest schema
         run: claude plugin validate .
+
+      - name: Validate plugin manifest schema
+        run: claude plugin validate .claude-plugin/plugin.json
 
       - name: Validate JSON syntax
         run: |

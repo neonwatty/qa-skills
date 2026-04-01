@@ -1,8 +1,6 @@
 ---
 name: validation-subagent
 description: Validates generated workflow markdown files independently. Runs mechanical checks, judgment observations, route coverage gaps, CRUD entity gaps, and produces validation-report.md.
-model: inherit
-color: cyan
 ---
 
 <example>
