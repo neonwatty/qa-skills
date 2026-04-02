@@ -4,21 +4,29 @@ Self-contained reference for running a full performance audit. Includes rating t
 
 ## Rating Thresholds
 
-| Metric | Good | Warning | Poor |
-|--------|------|---------|------|
-| LCP | <= 2500ms | <= 4000ms | > 4000ms |
-| CLS | <= 0.1 | <= 0.25 | > 0.25 |
-| INP | <= 200ms | <= 500ms | > 500ms |
-| FCP | <= 1800ms | <= 3000ms | > 3000ms |
-| TTFB | <= 800ms | <= 1800ms | > 1800ms |
-| TBT | <= 200ms | <= 300ms | > 300ms |
-| Total JS (compressed) | <= 300KB | <= 500KB | > 500KB |
-| Total page weight | <= 2000KB | <= 4000KB | > 4000KB |
-| DOM nodes | <= 1500 | <= 3000 | > 3000 |
-| Long Tasks count | <= 3 | <= 6 | > 6 or any single > 200ms |
-| HTTP requests | <= 50 | <= 75 | > 75 |
-| JS Execution Time | <= 2s | <= 3.5s | > 3.5s |
-| Lighthouse Performance score | >= 90 | >= 50 | < 50 |
+| Metric | Tier | Good | Warning | Poor |
+|--------|------|------|---------|------|
+| TTFB | `[D]` | <= 800ms | <= 1800ms | > 1800ms |
+| FCP | `[D]` | <= 1800ms | <= 3000ms | > 3000ms |
+| LCP | `[D, Chromium-only]` | <= 2500ms | <= 4000ms | > 4000ms |
+| CLS | `[D, Chromium-only]` | <= 0.1 | <= 0.25 | > 0.25 |
+| INP | — | <= 200ms | <= 500ms | > 500ms |
+| TBT | `[D, Chromium-only]` | <= 200ms | <= 300ms | > 300ms |
+| Total JS (compressed) | `[D]` | <= 300KB | <= 500KB | > 500KB |
+| Total page weight | `[D]` | <= 2000KB | <= 4000KB | > 4000KB |
+| DOM nodes | `[D]` | <= 1500 | <= 3000 | > 3000 |
+| Long Tasks count | `[D, Chromium-only]` | <= 3 | <= 6 | > 6 or any single > 200ms |
+| HTTP requests | `[D]` | <= 50 | <= 75 | > 75 |
+| JS Execution Time | `[D]` | <= 2s | <= 3.5s | > 3.5s |
+| Lighthouse Performance score | `[D]` | >= 90 | >= 50 | < 50 |
+| Memory | `[D, Chromium-only]` | — | — | — |
+
+## Measurement Tiers
+
+- **`[D]` Deterministic** — Returns same numeric value on same page every time.
+- **`[D, Chromium-only]`** — Deterministic but requires Chromium browser. Returns `{ available: false }` on Firefox/WebKit.
+
+All runtime metrics and static checks in this file are deterministic. Chromium-only metrics are noted.
 
 ## Runtime Measurement Scripts
 
@@ -40,6 +48,18 @@ browser_evaluate function:
 () => {
   const nav = performance.getEntriesByType('navigation')[0];
   if (!nav) return { available: false };
+  if (nav.loadEventEnd === 0) {
+    return {
+      available: true,
+      partial: true,
+      note: 'load event not yet complete',
+      ttfb_ms: Math.round(nav.responseStart - nav.requestStart),
+      dom_content_loaded_ms: Math.round(nav.domContentLoadedEventEnd - nav.startTime),
+      load_complete_ms: null,
+      transfer_size_kb: Math.round(nav.transferSize / 1024 * 100) / 100,
+      dom_interactive_ms: Math.round(nav.domInteractive - nav.startTime),
+    };
+  }
   return {
     available: true,
     ttfb_ms: Math.round(nav.responseStart - nav.requestStart),
@@ -57,35 +77,27 @@ browser_evaluate function:
 browser_evaluate function:
 () => {
   return new Promise(resolve => {
-    const entries = performance.getEntriesByType('largest-contentful-paint');
-    if (entries.length > 0) {
-      const last = entries[entries.length - 1];
-      resolve({
-        available: true,
-        lcp_ms: Math.round(last.startTime),
-        element: last.element?.tagName?.toLowerCase() || 'unknown',
-        url: last.url || null,
-        size: last.size,
+    try {
+      let lastEntry = null;
+      const observer = new PerformanceObserver(list => {
+        const entries = list.getEntries();
+        if (entries.length > 0) lastEntry = entries[entries.length - 1];
       });
-      return;
+      observer.observe({ type: 'largest-contentful-paint', buffered: true });
+      
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(lastEntry ? {
+          available: true,
+          lcp_ms: Math.round(lastEntry.startTime),
+          element: lastEntry.element?.tagName?.toLowerCase() || 'unknown',
+          url: lastEntry.url || null,
+          size: lastEntry.size,
+        } : { available: false, reason: 'no LCP entries observed within 5s' });
+      }, 5000);
+    } catch (e) {
+      resolve({ available: false, reason: 'LCP observer not supported in this browser' });
     }
-    // Fallback: observe for up to 3 seconds
-    let lastEntry = null;
-    const observer = new PerformanceObserver(list => {
-      const e = list.getEntries();
-      if (e.length > 0) lastEntry = e[e.length - 1];
-    });
-    observer.observe({ type: 'largest-contentful-paint', buffered: true });
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(lastEntry ? {
-        available: true,
-        lcp_ms: Math.round(lastEntry.startTime),
-        element: lastEntry.element?.tagName?.toLowerCase() || 'unknown',
-        url: lastEntry.url || null,
-        size: lastEntry.size,
-      } : { available: false });
-    }, 3000);
   });
 }
 ```
@@ -96,49 +108,77 @@ browser_evaluate function:
 browser_evaluate function:
 () => {
   return new Promise(resolve => {
-    let clsValue = 0;
-    let clsEntries = [];
-    const entries = performance.getEntriesByType('layout-shift');
-    if (entries.length > 0) {
+    let sessionWindows = [];
+    let currentWindow = { shifts: [], score: 0, start: 0 };
+
+    const processEntries = (entries) => {
       for (const entry of entries) {
-        if (!entry.hadRecentInput) {
-          clsValue += entry.value;
-          clsEntries.push({
-            value: Math.round(entry.value * 10000) / 10000,
-            startTime: Math.round(entry.startTime),
-          });
+        if (entry.hadRecentInput) continue;
+        
+        const shiftValue = entry.value;
+        const shiftTime = entry.startTime;
+        
+        // Start new window if: first shift, gap > 1s, or window > 5s
+        if (currentWindow.shifts.length === 0 ||
+            shiftTime - currentWindow.shifts[currentWindow.shifts.length - 1].startTime > 1000 ||
+            shiftTime - currentWindow.start > 5000) {
+          if (currentWindow.shifts.length > 0) {
+            sessionWindows.push({ ...currentWindow });
+          }
+          currentWindow = { shifts: [], score: 0, start: shiftTime };
         }
+        
+        currentWindow.score += shiftValue;
+        currentWindow.shifts.push({
+          value: Math.round(shiftValue * 10000) / 10000,
+          startTime: Math.round(shiftTime)
+        });
       }
-      resolve({
-        available: true,
-        cls: Math.round(clsValue * 10000) / 10000,
-        shift_count: clsEntries.length,
-        shifts: clsEntries.slice(0, 5),
-      });
-      return;
+    };
+
+    // Try buffered entries first
+    const bufferedEntries = performance.getEntriesByType('layout-shift');
+    if (bufferedEntries.length > 0) {
+      processEntries(bufferedEntries);
     }
-    // Fallback: observe for up to 3 seconds
-    const observer = new PerformanceObserver(list => {
-      for (const entry of list.getEntries()) {
-        if (!entry.hadRecentInput) {
-          clsValue += entry.value;
-          clsEntries.push({
-            value: Math.round(entry.value * 10000) / 10000,
-            startTime: Math.round(entry.startTime),
-          });
-        }
+
+    // Also observe for new shifts
+    let observer;
+    try {
+      observer = new PerformanceObserver(list => {
+        processEntries(list.getEntries());
+      });
+      observer.observe({ type: 'layout-shift', buffered: true });
+    } catch (e) {
+      // layout-shift not supported (Firefox/WebKit)
+      if (sessionWindows.length === 0) {
+        resolve({ available: false, reason: 'layout-shift observer not supported' });
+        return;
       }
-    });
-    observer.observe({ type: 'layout-shift', buffered: true });
+    }
+
     setTimeout(() => {
-      observer.disconnect();
+      if (observer) observer.disconnect();
+      // Finalize current window
+      if (currentWindow.shifts.length > 0) {
+        sessionWindows.push({ ...currentWindow });
+      }
+      
+      // CLS = largest session window score
+      const cls = sessionWindows.length > 0
+        ? Math.max(...sessionWindows.map(w => w.score))
+        : 0;
+      
       resolve({
         available: true,
-        cls: Math.round(clsValue * 10000) / 10000,
-        shift_count: clsEntries.length,
-        shifts: clsEntries.slice(0, 5),
+        cls: Math.round(cls * 10000) / 10000,
+        sessionWindowCount: sessionWindows.length,
+        largestWindow: sessionWindows.length > 0
+          ? sessionWindows.reduce((max, w) => w.score > max.score ? w : max)
+          : null,
+        totalShifts: sessionWindows.reduce((sum, w) => sum + w.shifts.length, 0)
       });
-    }, 3000);
+    }, 5000);
   });
 }
 ```
@@ -162,7 +202,11 @@ browser_evaluate function:
 
   const total_kb = Math.round(resources.reduce((sum, r) => sum + r.transferSize, 0) / 1024);
   const js_kb = Math.round(resources.filter(r => r.initiatorType === 'script').reduce((sum, r) => sum + r.transferSize, 0) / 1024);
-  const css_kb = Math.round(resources.filter(r => r.initiatorType === 'link' || r.initiatorType === 'css').reduce((sum, r) => sum + r.transferSize, 0) / 1024);
+  const css_kb = Math.round(resources.filter(r => 
+    r.initiatorType === 'css' || 
+    (r.initiatorType === 'link' && r.name.endsWith('.css'))
+  ).reduce((sum, r) => sum + r.transferSize, 0) / 1024);
+  const opaque_resources = resources.filter(r => r.transferSize === 0).length;
   const img_kb = Math.round(resources.filter(r => r.initiatorType === 'img').reduce((sum, r) => sum + r.transferSize, 0) / 1024);
 
   return {
@@ -171,6 +215,7 @@ browser_evaluate function:
     js_kb,
     css_kb,
     img_kb,
+    opaque_resources,
     heavy_resources: heavy,
   };
 }
@@ -193,23 +238,30 @@ browser_evaluate function:
 browser_evaluate function:
 () => {
   return new Promise(resolve => {
-    const tasks = [];
-    const observer = new PerformanceObserver(list => {
-      for (const entry of list.getEntries()) {
-        tasks.push({ duration_ms: Math.round(entry.duration), startTime: Math.round(entry.startTime) });
-      }
-    });
-    observer.observe({ type: 'longtask', buffered: true });
-    setTimeout(() => {
-      observer.disconnect();
-      const tbt = tasks.reduce((sum, t) => sum + Math.max(0, t.duration_ms - 50), 0);
-      resolve({
-        count: tasks.length,
-        tbt_ms: tbt,
-        longest_ms: tasks.length > 0 ? Math.max(...tasks.map(t => t.duration_ms)) : 0,
-        tasks: tasks.slice(0, 10)
+    try {
+      const tasks = [];
+      const observer = new PerformanceObserver(list => {
+        for (const entry of list.getEntries()) {
+          tasks.push({ duration_ms: Math.round(entry.duration), startTime: Math.round(entry.startTime) });
+        }
       });
-    }, 5000);
+      observer.observe({ type: 'longtask', buffered: true });
+      
+      setTimeout(() => {
+        observer.disconnect();
+        const tbt = tasks.reduce((sum, t) => sum + Math.max(0, t.duration_ms - 50), 0);
+        resolve({
+          available: true,
+          count: tasks.length,
+          tbt_ms: tbt,
+          longest_ms: tasks.length > 0 ? Math.max(...tasks.map(t => t.duration_ms)) : 0,
+          tasks: tasks.slice(0, 10),
+          note: 'TBT only covers the 8-second observation window after script injection. Tasks during initial page load may be missed if buffered:true is not supported.'
+        });
+      }, 8000);
+    } catch (e) {
+      resolve({ available: false, reason: 'longtask observer not supported in this browser' });
+    }
   });
 }
 ```
@@ -268,14 +320,36 @@ browser_resize width=393 height=852
 
 Compare metrics across viewports — mobile often has different LCP elements and more layout shifts.
 
+## Page Settled Detection
+
+Before running any measurement script, ensure the page is settled. After `browser_navigate` and `browser_wait_for`:
+
+1. Wait 2 seconds for lazy loading and layout shifts
+2. Run this settle check:
+
+```javascript
+browser_evaluate:
+(() => {
+  return {
+    readyState: document.readyState,
+    fontsReady: document.fonts.status === 'loaded',
+    runningAnimations: document.getAnimations().filter(a => a.playState === 'running').length,
+    pendingImages: [...document.images].filter(img => !img.complete).length
+  };
+})()
+```
+
+If `runningAnimations > 0` or `pendingImages > 0`, wait an additional 2 seconds and re-check. Maximum 3 settle attempts before proceeding.
+
 ## Per-Route Profiling Loop
 
 For each route to profile:
 
 ```
+0. Run Page Settled Detection (see above)
 1. browser_navigate url="<route>"
 2. browser_wait_for text="<expected>" timeout=10000
-3. Wait 2 seconds for settle (layout shifts, lazy loading)
+3. Run Page Settled Detection settle check (wait + verify)
 4. Collect Navigation Timing (Step 2)
 5. Collect LCP (Step 3)
 6. Collect CLS (Step 4)
@@ -413,3 +487,20 @@ Detailed check tables for each performance category. Each check is tagged with t
 | SC6 | Missing `generateMetadata` for SEO pages                 | Pages without `generateMetadata` or `metadata` export. Missing metadata delays LCP on pages where the browser waits for title/description.                                    | LOW      | LCP       |
 | SC7 | Route handlers that should be Server Actions             | POST/PUT/DELETE API routes that are only called from forms or buttons in the same app. Server Actions eliminate the API route overhead and work with progressive enhancement. | LOW      | TTFB      |
 | SC8 | Missing parallel routes for independent sections         | Page sections that load different data at different speeds but are rendered sequentially. Parallel routes (`@section`) with `<Suspense>` stream independently.                | MEDIUM   | TTFB, LCP |
+
+## Browser Compatibility
+
+| Metric | Chromium | Firefox | WebKit | Fallback |
+|--------|----------|---------|--------|----------|
+| Navigation Timing (TTFB) | Yes | Yes | Yes | — |
+| FCP (paint entries) | Yes | Yes | Yes | — |
+| LCP | Yes | No | No | `{ available: false }` |
+| CLS (layout-shift) | Yes | No | No | `{ available: false }` |
+| Long Tasks / TBT | Yes | No | No | `{ available: false }` |
+| Memory | Yes | No | No | `{ available: false }` |
+| Resource Timing | Yes | Yes | Yes | — |
+| DOM Health | Yes | Yes | Yes | — |
+
+**Recommendation:** Default to Chromium for comprehensive performance measurement. When running on Firefox or WebKit, the scorecard denominator adjusts to only count available metrics.
+
+**INP Note:** Interaction to Next Paint (INP) is a field-only metric requiring real user interactions. It cannot be measured in lab/synthetic testing. TBT (Total Blocking Time) is the recommended lab proxy for INP. The thresholds table lists INP for reference but measurement scripts do not collect it.
