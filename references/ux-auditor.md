@@ -22,6 +22,30 @@ Each check is tagged with its measurement confidence level:
 
 ---
 
+## Measurement Utilities
+
+### Shadow DOM Traversal
+
+Many modern web apps use Shadow DOM (Web Components, Shoelace, Lit, Ionic). Standard `querySelectorAll` does not traverse shadow roots. Use this utility in scripts that need complete DOM coverage:
+
+```javascript
+function deepQuerySelectorAll(selector, root = document) {
+  const results = [...root.querySelectorAll(selector)];
+  root.querySelectorAll('*').forEach(el => {
+    if (el.shadowRoot) {
+      results.push(...deepQuerySelectorAll(selector, el.shadowRoot));
+    }
+  });
+  return results;
+}
+```
+
+Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts that measure touch targets, form attributes, text elements, interactive elements, or any check where Shadow DOM elements would be missed. For performance, only use when `document.querySelectorAll('*').length` and custom element detection suggest shadow roots are present.
+
+**Known limitation:** Cross-origin iframes cannot be traversed. Third-party widgets (chat, payments, auth) inside cross-origin iframes are invisible to all measurement scripts. Document this in findings as "iframe content not audited."
+
+---
+
 ## Category 1: Visual Consistency
 
 - [ ] `[H]` Typography: font sizes, weights, and line heights follow a consistent scale

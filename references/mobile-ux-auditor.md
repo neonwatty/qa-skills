@@ -22,6 +22,30 @@ This reference contains all 10 mobile audit categories, measurement scripts, thr
 
 ---
 
+## Measurement Utilities
+
+### Shadow DOM Traversal
+
+Many modern web apps use Shadow DOM (Web Components, Shoelace, Lit, Ionic). Standard `querySelectorAll` does not traverse shadow roots. Use this utility in scripts that need complete DOM coverage:
+
+```javascript
+function deepQuerySelectorAll(selector, root = document) {
+  const results = [...root.querySelectorAll(selector)];
+  root.querySelectorAll('*').forEach(el => {
+    if (el.shadowRoot) {
+      results.push(...deepQuerySelectorAll(selector, el.shadowRoot));
+    }
+  });
+  return results;
+}
+```
+
+Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts measuring touch targets, form attributes, text elements, or interactive elements. Only invoke when custom elements are detected.
+
+**Known limitation:** Cross-origin iframes cannot be traversed. Document in findings as "iframe content not audited."
+
+---
+
 ## Category 1: Touch & Interaction (7 checks)
 
 | # | Check | Tier | Threshold | Method | Severity |

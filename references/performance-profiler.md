@@ -28,6 +28,26 @@ Self-contained reference for running a full performance audit. Includes rating t
 
 All runtime metrics and static checks in this file are deterministic. Chromium-only metrics are noted.
 
+## Measurement Utilities
+
+### Shadow DOM Traversal
+
+Use `deepQuerySelectorAll` in the DOM Health script (Step 8) to count nodes inside shadow roots:
+
+```javascript
+function deepQuerySelectorAll(selector, root = document) {
+  const results = [...root.querySelectorAll(selector)];
+  root.querySelectorAll('*').forEach(el => {
+    if (el.shadowRoot) {
+      results.push(...deepQuerySelectorAll(selector, el.shadowRoot));
+    }
+  });
+  return results;
+}
+```
+
+**Known limitation:** Cross-origin iframes cannot be traversed.
+
 ## Runtime Measurement Scripts
 
 Measurement patterns for capturing performance metrics in authenticated browser sessions using `browser_evaluate`. These must be run AFTER `browser_navigate` but BEFORE any user interaction, then read AFTER a settle period.
