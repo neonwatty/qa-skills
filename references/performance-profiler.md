@@ -384,6 +384,63 @@ For each route to profile:
 
 Repeat at each viewport size if doing multi-viewport profiling.
 
+### SPA Soft Navigation Limitation
+
+The profiling loop uses `browser_navigate` for each route, which triggers full page loads. In SPAs with client-side routing (Next.js App Router, React Router, SvelteKit), real users navigate via link clicks that produce soft navigations. Metrics from hard navigations may differ significantly from the in-app experience:
+
+- **LCP** may be much higher on hard navigation (full page load) vs soft navigation (incremental update)
+- **CLS** patterns differ (hard nav has initial layout; soft nav has transition shifts)
+- **TTFB** is irrelevant for soft navigations (no server request)
+- **TBT** may be lower on soft navigation (no initial JS parsing)
+
+**Mitigation:** For SPA routes, consider an additional measurement pass:
+1. Navigate to the app's entry point via `browser_navigate`
+2. Click through to the target route via internal links using `browser_click`
+3. Wait for content to settle (use Page Settled Detection)
+4. Measure metrics after the soft navigation
+
+This requires Playwright interaction orchestration and is not yet automated in the standard profiling loop. When auditing SPAs, document this gap in findings and note whether metrics reflect hard or soft navigation.
+
+**Detection:** Check for SPA frameworks by looking for `window.__NEXT_DATA__` (Next.js), `window.__NUXT__` (Nuxt), `[id="__svelte"]` (SvelteKit), or `[data-reactroot]` (React). If detected, note in the report that metrics reflect hard navigation only.
+
+## Multiple-Run Measurement
+
+For reliable before/after comparison, timing-based metrics require multiple runs.
+
+### Protocol
+
+1. Run the full profiling loop **3 times** for each route
+2. For each metric, report the **median** of the 3 runs
+3. For before/after comparisons:
+   - Run 3 times before changes, 3 times after
+   - Compare median values
+   - Flag changes < 10% as "within measurement noise"
+   - Only report improvements/regressions where the change exceeds 10% consistently
+
+### Metric Stability
+
+| Metric | Stability | Recommended Runs | Notes |
+|--------|-----------|-----------------|-------|
+| TTFB | Low | 5 runs, report median | Highly variable: server load, network, CDN cache |
+| FCP | Medium | 3 runs | Affected by network and parsing |
+| LCP | Medium | 3 runs | Cache state affects result |
+| CLS | Low-Medium | 3 runs | Timing of async content matters |
+| TBT | Medium | 3 runs | CPU load and background processes |
+| DOM nodes | High | 1 run sufficient | Deterministic for same content |
+| Bundle sizes | High | 1 run sufficient | Deterministic from build output |
+| Resource count | High | 1 run sufficient | Deterministic for same page |
+| Memory | Low | 5 runs, report median | GC timing, quantized values |
+
+### Environment Consistency
+
+For valid before/after comparison, hold constant:
+- Viewport dimensions (already specified: 1280x720 desktop, 393x852 mobile)
+- Browser version (Chromium recommended for comprehensive metrics)
+- Network conditions (unthrottled, or use consistent throttling profile)
+- Cache state (clear browser cache between runs: `page.context().clearCookies()` + navigate to `about:blank`)
+- Data state (same database content / seed data if possible)
+- Time of day (avoid comparing 2 AM measurement vs peak-hour measurement on shared hosting)
+
 ## Static Analysis Checks
 
 Detailed check tables for each performance category. Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Contentful Paint), **CLS** (Cumulative Layout Shift), **INP** (Interaction to Next Paint), **TTFB** (Time to First Byte).
@@ -443,6 +500,23 @@ Detailed check tables for each performance category. Each check is tagged with t
 | I6  | Missing `sizes` prop on responsive images | `next/image` defaults to generating srcset for all sizes. The `sizes` prop tells the browser which size to request, preventing over-fetching on small screens.                                 | LOW      | LCP      |
 | I7  | Large SVGs inlined in JavaScript          | SVG icons >2KB inlined as React components instead of loaded as files or using an icon sprite. Multiple large SVGs add to bundle size.                                                         | MEDIUM   | LCP      |
 | I8  | Missing favicon/icon optimization         | Multiple unoptimized favicon formats. Use `next/metadata` icon configuration for automatic optimization.                                                                                       | LOW      | TTFB     |
+
+#### Font Loading Strategy
+
+| # | Check | What to look for | Severity | Vitals |
+|---|-------|-----------------|----------|--------|
+| FL1 | Missing `font-display` on @font-face | @font-face rules without `font-display: swap` or `font-display: optional`. Causes invisible text during font load (FOIT). Check CSS files and `<style>` tags for @font-face declarations. | HIGH | LCP, CLS |
+| FL2 | Web fonts not preloaded | Critical web fonts (used in above-fold text) not loaded via `<link rel="preload" as="font" crossorigin>`. Delays text rendering. Check `<head>` for preload links matching font URLs. | MEDIUM | LCP |
+| FL3 | Missing `size-adjust` on fallback fonts | Font fallback declarations without `size-adjust`, `ascent-override`, or `descent-override`. Causes layout shift when web font loads and metrics differ from fallback. | LOW | CLS |
+
+#### Resource Hints
+
+| # | Check | What to look for | Severity | Vitals |
+|---|-------|-----------------|----------|--------|
+| RH1 | Missing `preconnect` for critical third-party origins | Third-party scripts (analytics, CDN, API) loaded without `<link rel="preconnect" href="..." crossorigin>`. Saves DNS+TCP+TLS time (~100-500ms per origin). Check network resources for third-party origins, then check `<head>` for matching preconnect links. | MEDIUM | TTFB, LCP |
+| RH2 | Missing `fetchpriority="high"` on LCP image | The LCP image element (hero/banner) should have `fetchpriority="high"` to tell the browser to prioritize its loading over other resources. Check the LCP element identified in runtime profiling. | HIGH | LCP |
+| RH3 | Missing `dns-prefetch` for external origins | External origins used later in page lifecycle (lazy-loaded content, deferred scripts) without `<link rel="dns-prefetch" href="...">`. Cheaper than preconnect for non-critical origins. | LOW | TTFB |
+| RH4 | Excessive `preload` usage | More than 3-4 `<link rel="preload">` resources in `<head>`. Overuse negates priority benefit and wastes bandwidth on resources that may not be needed immediately. Count preload links. | LOW | LCP |
 
 ### 5. Third-party SDKs
 
