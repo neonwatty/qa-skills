@@ -53,21 +53,21 @@ Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts tha
 - [ ] `[H]` Colors: brand colors are used consistently, no off-by-one hex values
 - [ ] `[H]` Border radii: consistent across similar elements (buttons, cards, inputs)
 - [ ] `[H]` Shadows: consistent depth system, not arbitrary values
-- [ ] `[J]` Icons: consistent style (outline vs filled), consistent sizing
+- [ ] `[H]` Icons: consistent style (outline vs filled), consistent sizing
 - [ ] `[H]` Alignment: elements are properly aligned to a grid, no off-by-1px misalignment `[heuristic]`
 
 ---
 
 ## Category 2: Component States
 
-- [ ] `[J]` Default state: clear, not ambiguous
+- [ ] `[J]` Default state: clear, not ambiguous (pre-filter: script 10)
 - [ ] `[H]` Hover state: present on all interactive elements, provides visual feedback
 - [ ] `[D]` Focus state: visible focus ring for keyboard navigation (accessibility)
-- [ ] `[J]` Active/pressed state: provides tactile feedback
+- [ ] `[H]` Active/pressed state: provides tactile feedback
 - [ ] `[D]` Disabled state: visually distinct, not clickable
 - [ ] `[H]` Loading state: present where async operations occur, uses consistent pattern
 - [ ] `[J]` Empty state: helpful message and action when no data exists (not just blank space)
-- [ ] `[J]` Error state: clear, specific, actionable error messages near the relevant field
+- [ ] `[H]` Error state: clear, specific, actionable error messages near the relevant field
 
 ---
 
@@ -78,7 +78,7 @@ Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts tha
 - [ ] `[H]` Placeholder text: helpful examples, not labels (labels should be above the field)
 - [ ] `[H]` Confirmation messages: tell the user what happened ("Profile updated" not "Success")
 - [ ] `[H]` Empty states: explain what goes here and how to add content
-- [ ] `[J]` Tooltips: present where needed, concise, not redundant with visible labels
+- [ ] `[J]` Tooltips: present where needed, concise, not redundant with visible labels (pre-filter: script 11)
 - [ ] `[H]` Grammar and spelling: no typos, consistent voice and tense
 
 ---
@@ -113,7 +113,7 @@ Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts tha
 - [ ] `[D]` Element overflow: text truncates gracefully (ellipsis, not clip)
 - [ ] `[H]` Image sizing: images are properly constrained, no layout shift on load
 - [ ] `[J]` Whitespace: balanced, no cramped or excessively empty areas `[heuristic]`
-- [ ] `[J]` Z-index: overlapping elements stack correctly (dropdowns, modals, tooltips)
+- [ ] `[J]` Z-index: overlapping elements stack correctly (dropdowns, modals, tooltips) (pre-filter: script 12)
 
 ---
 
@@ -153,7 +153,7 @@ Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts tha
 
 - [ ] `[D]` Visible fields per section: 3-5 good, 6-7 warning, >7 bad
 - [ ] `[D]` Error message position: inline = good, top of form = warning, console/alert = bad
-- [ ] `[J]` Error message actionability: names field + fix = good, generic = warning, missing = bad
+- [ ] `[H]` Error message actionability: names field + fix = good, generic = warning, missing = bad
 - [ ] `[H]` Validation timing (granular): on-blur = good, on-submit only = warning, premature = bad
 - [ ] `[D]` Multi-step progress indicator: present for >5 fields = good, absent = bad
 - [ ] `[D]` Destructive action confirmation: specific verb = good, generic OK/Cancel = warning, none = bad
@@ -165,7 +165,7 @@ Use `deepQuerySelectorAll` instead of `document.querySelectorAll` in scripts tha
 
 ### Existing Checks
 
-- [ ] `[J]` Action feedback: every user action gets visible confirmation
+- [ ] `[H]` Action feedback: every user action gets visible confirmation
 - [ ] `[H]` Loading indicators: present during async operations, appropriate type (spinner vs skeleton vs progress)
 - [ ] `[J]` Optimistic updates: UI responds immediately where appropriate
 - [ ] `[H]` Error recovery: clear path to retry or correct after errors
@@ -764,6 +764,658 @@ JavaScript snippets for all automatable checks. Each returns a structured result
   const clusteredCount = clustered.length;
   const grade = clusteredCount <= 15 ? 'good' : clusteredCount <= 25 ? 'warning' : 'bad';
   return { check: 'color_audit', rawDistinctColors: rawCount, clusteredDistinctColors: clusteredCount, grade, values: [...rawColors] };
+})()
+```
+
+### Heuristic Scripts for LLM-Assisted Checks
+
+These scripts provide programmatic pre-measurement for checks that were previously LLM-judgment only. They produce heuristic signals with 70-95% confidence. The agent should use these results to inform its assessment rather than relying purely on screenshot interpretation.
+
+#### 1. Icon Style Consistency
+
+```javascript
+(() => {
+  const svgs = deepQuerySelectorAll('svg');
+  let outlineCount = 0;
+  let filledCount = 0;
+  const strokeWidths = new Set();
+
+  svgs.forEach(svg => {
+    const rect = svg.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    if (size < 12 || size > 64 || rect.width === 0) return;
+
+    const paths = svg.querySelectorAll('path, circle, rect, line, polyline, polygon');
+    let hasStroke = false;
+    let hasFill = false;
+
+    paths.forEach(p => {
+      const style = getComputedStyle(p);
+      const stroke = style.stroke;
+      const fill = style.fill;
+      const strokeW = parseFloat(style.strokeWidth) || 0;
+      if (stroke && stroke !== 'none' && strokeW > 0) {
+        hasStroke = true;
+        strokeWidths.add(Math.round(strokeW * 10) / 10);
+      }
+      if (fill && fill !== 'none' && fill !== 'transparent') {
+        hasFill = true;
+      }
+    });
+
+    if (hasStroke && !hasFill) outlineCount++;
+    else if (hasFill && !hasStroke) filledCount++;
+    else if (hasFill && hasStroke) filledCount++;
+  });
+
+  const isMixed = outlineCount > 0 && filledCount > 0;
+  const strokeConsistent = strokeWidths.size <= 1;
+  const total = outlineCount + filledCount;
+  const grade = total === 0 ? 'good' : (!isMixed && strokeConsistent) ? 'good' : (!isMixed || strokeConsistent) ? 'warning' : 'bad';
+
+  return { check: 'icon_style_consistency', outlineCount, filledCount, isMixed, strokeConsistent, strokeWidths: [...strokeWidths], grade };
+})()
+```
+
+#### 2. Error Message Specificity
+
+```javascript
+(() => {
+  const errorEls = deepQuerySelectorAll('[class*="error"], [role="alert"], [class*="invalid"], [class*="err-msg"]');
+  const badPhrases = [
+    'something went wrong', 'error', 'oops', 'try again', 'invalid',
+    'failed', 'please try again', 'unknown error', 'an error occurred',
+    'unexpected error', 'sorry', 'whoops', 'uh oh'
+  ];
+
+  const results = [];
+  let flaggedCount = 0;
+
+  errorEls.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (el.textContent || '').trim().toLowerCase();
+    if (!text) return;
+
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const tooShort = words.length < 4;
+    const matchesBad = badPhrases.some(phrase => text === phrase || (words.length <= 5 && text.includes(phrase)));
+    const flagged = tooShort || matchesBad;
+
+    if (flagged) flaggedCount++;
+    results.push({ text: text.substring(0, 80), words: words.length, tooShort, matchesBad, flagged });
+  });
+
+  const grade = results.length === 0 ? 'good' : flaggedCount === 0 ? 'good' : flaggedCount <= 1 ? 'warning' : 'bad';
+  return { check: 'error_message_specificity', total: results.length, flaggedCount, details: results.slice(0, 10), grade };
+})()
+```
+
+#### 3. Button Label Quality
+
+```javascript
+(() => {
+  const buttons = deepQuerySelectorAll('button, [role="button"], a[role="button"]');
+  const genericLabels = new Set(['submit', 'ok', 'yes', 'no', 'go', 'click here', 'click', 'here', 'press', 'next', 'back']);
+  const actionVerbRe = /^(save|create|delete|remove|send|cancel|confirm|update|add|edit|upload|download|apply|reset|search|filter|sign|log|register|subscribe|share|copy|close|open|expand|collapse|retry|undo|redo|approve|reject|publish|archive|restore)/i;
+
+  const results = [];
+  let genericCount = 0;
+  let actionVerbCount = 0;
+
+  buttons.forEach(btn => {
+    const rect = btn.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (btn.textContent || btn.getAttribute('aria-label') || '').trim();
+    if (!text) return;
+
+    const lower = text.toLowerCase();
+    const words = lower.split(/\s+/);
+    const isGeneric = words.length === 1 && genericLabels.has(lower);
+    const hasActionVerb = actionVerbRe.test(lower);
+
+    if (isGeneric) genericCount++;
+    if (hasActionVerb) actionVerbCount++;
+    results.push({ text: text.substring(0, 40), isGeneric, hasActionVerb });
+  });
+
+  const total = results.length;
+  const grade = total === 0 ? 'good' : genericCount === 0 ? 'good' : genericCount <= 1 ? 'warning' : 'bad';
+  return { check: 'button_label_quality', total, genericCount, actionVerbCount, details: results.slice(0, 15), grade };
+})()
+```
+
+#### 4. Placeholder Text Quality
+
+```javascript
+(() => {
+  const inputs = deepQuerySelectorAll('input[placeholder], textarea[placeholder]');
+  const examplePatterns = [/@/, /\d{3}[\s.-]\d{3}/, /john|jane|doe/i, /e\.g\./i, /example/i, /\(\d{3}\)/, /\d{5}/];
+  const results = [];
+  let badCount = 0;
+
+  inputs.forEach(input => {
+    const rect = input.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const placeholder = (input.getAttribute('placeholder') || '').trim();
+    if (!placeholder) return;
+
+    const label = input.labels && input.labels[0] ? input.labels[0].textContent.trim() : '';
+    const ariaLabel = input.getAttribute('aria-label') || '';
+    const hasLabel = label.length > 0 || ariaLabel.length > 0;
+
+    const matchesLabel = label && placeholder.toLowerCase() === label.toLowerCase();
+    const looksLikeExample = examplePatterns.some(p => p.test(placeholder));
+    const actsAsLabel = !hasLabel && placeholder.length > 0;
+    const bad = matchesLabel || actsAsLabel;
+
+    if (bad) badCount++;
+    results.push({
+      placeholder: placeholder.substring(0, 50),
+      label: label.substring(0, 50),
+      matchesLabel,
+      looksLikeExample,
+      actsAsLabel,
+      bad
+    });
+  });
+
+  const grade = results.length === 0 ? 'good' : badCount === 0 ? 'good' : badCount <= 1 ? 'warning' : 'bad';
+  return { check: 'placeholder_text_quality', total: results.length, badCount, details: results.slice(0, 10), grade };
+})()
+```
+
+#### 5. Confirmation Message Quality
+
+```javascript
+(() => {
+  const successEls = deepQuerySelectorAll('[class*="success"], [role="status"], [class*="toast"], [class*="notification"]');
+  const genericSet = ['success', 'done', 'ok', 'completed', 'saved', 'updated', 'submitted', 'confirmed'];
+  const results = [];
+  let genericCount = 0;
+
+  successEls.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (el.textContent || '').trim();
+    if (!text) return;
+
+    const lower = text.toLowerCase();
+    const words = lower.split(/\s+/).filter(w => w.length > 0);
+    const isGeneric = words.length <= 2 && genericSet.some(g => lower.includes(g));
+    const hasSubjectNoun = words.length >= 3;
+
+    if (isGeneric) genericCount++;
+    results.push({ text: text.substring(0, 80), words: words.length, isGeneric, hasSubjectNoun });
+  });
+
+  const grade = results.length === 0 ? 'good' : genericCount === 0 ? 'good' : genericCount <= 1 ? 'warning' : 'bad';
+  return { check: 'confirmation_message_quality', total: results.length, genericCount, details: results.slice(0, 10), grade };
+})()
+```
+
+#### 6. Empty State Quality (3-component)
+
+```javascript
+(() => {
+  const containers = deepQuerySelectorAll('[class*="empty"], [class*="no-data"], [class*="no-results"], [class*="zero-state"], [class*="empty-state"], [class*="blank-slate"]');
+  const results = [];
+  let perfectCount = 0;
+
+  containers.forEach(container => {
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const text = (container.textContent || '').trim();
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const hasText = words.length >= 5;
+
+    const ctas = container.querySelectorAll('a, button, [role="button"]');
+    const hasCTA = ctas.length > 0;
+
+    const visuals = container.querySelectorAll('svg, img, [class*="icon"], [class*="illustration"]');
+    let hasVisual = false;
+    visuals.forEach(v => {
+      const vRect = v.getBoundingClientRect();
+      if (vRect.width >= 20 && vRect.height >= 20) hasVisual = true;
+    });
+
+    const score = (hasText ? 1 : 0) + (hasCTA ? 1 : 0) + (hasVisual ? 1 : 0);
+    if (score === 3) perfectCount++;
+    results.push({ text: text.substring(0, 60), hasText, hasCTA, hasVisual, score });
+  });
+
+  const total = results.length;
+  const grade = total === 0 ? 'good' : (perfectCount === total) ? 'good' : (perfectCount >= total / 2) ? 'warning' : 'bad';
+  return { check: 'empty_state_quality', total, perfectCount, details: results.slice(0, 10), grade };
+})()
+```
+
+#### 7. Content Not Color-Only
+
+```javascript
+(() => {
+  const violations = [];
+
+  // Check inline links in paragraphs: flag if no underline, no bold, no icon
+  const paragraphs = deepQuerySelectorAll('p, [class*="text"], [class*="content"]');
+  paragraphs.forEach(p => {
+    const links = p.querySelectorAll('a');
+    links.forEach(link => {
+      const rect = link.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const style = getComputedStyle(link);
+      const hasUnderline = style.textDecoration.includes('underline');
+      const hasBold = parseInt(style.fontWeight) >= 600;
+      const hasIcon = link.querySelector('svg, img, [class*="icon"]') !== null;
+      if (!hasUnderline && !hasBold && !hasIcon) {
+        violations.push({ type: 'link-color-only', text: link.textContent.trim().substring(0, 40) });
+      }
+    });
+  });
+
+  // Check form inputs with colored borders: flag if no text/icon indicator nearby
+  const inputs = deepQuerySelectorAll('input, select, textarea');
+  inputs.forEach(input => {
+    const style = getComputedStyle(input);
+    const borderColor = style.borderColor.toLowerCase();
+    const isColoredBorder = borderColor.includes('255') || borderColor.includes('red') || borderColor.includes('green');
+    if (!isColoredBorder) return;
+    const parent = input.parentElement;
+    if (!parent) return;
+    const textIndicator = parent.querySelector('[class*="error"], [class*="success"], [class*="help"], [role="alert"]');
+    const iconIndicator = parent.querySelector('svg, [class*="icon"]');
+    if (!textIndicator && !iconIndicator) {
+      violations.push({ type: 'input-color-only', name: input.name || input.id || 'unnamed' });
+    }
+  });
+
+  // Check status indicators: flag if no text or aria-label
+  const statusEls = deepQuerySelectorAll('[class*="status"], [class*="badge"], [class*="indicator"]');
+  statusEls.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (el.textContent || '').trim();
+    const ariaLabel = el.getAttribute('aria-label') || '';
+    if (!text && !ariaLabel) {
+      violations.push({ type: 'status-color-only', classes: el.className.substring(0, 60) });
+    }
+  });
+
+  const grade = violations.length === 0 ? 'good' : violations.length <= 2 ? 'warning' : 'bad';
+  return { check: 'content_not_color_only', violationCount: violations.length, details: violations.slice(0, 15), grade };
+})()
+```
+
+#### 8. Dead End Detection
+
+```javascript
+(() => {
+  const allLinks = deepQuerySelectorAll('a[href]');
+  let outboundCount = 0;
+
+  allLinks.forEach(link => {
+    const rect = link.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const href = link.getAttribute('href') || '';
+    if (href === '#' || href.startsWith('javascript:') || href === '') return;
+    outboundCount++;
+  });
+
+  const buttons = deepQuerySelectorAll('button, [role="button"]');
+  let visibleButtonCount = 0;
+  buttons.forEach(btn => {
+    const rect = btn.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) visibleButtonCount++;
+  });
+
+  const navElements = deepQuerySelectorAll('nav, [role="navigation"]');
+  let visibleNavCount = 0;
+  navElements.forEach(nav => {
+    const rect = nav.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) visibleNavCount++;
+  });
+
+  const isDeadEnd = outboundCount === 0 && visibleNavCount === 0;
+  const isNearDeadEnd = outboundCount <= 1 && visibleNavCount === 0;
+  const grade = isDeadEnd ? 'bad' : isNearDeadEnd ? 'warning' : 'good';
+
+  return { check: 'dead_end_detection', outboundLinks: outboundCount, visibleButtons: visibleButtonCount, navElements: visibleNavCount, isDeadEnd, isNearDeadEnd, grade };
+})()
+```
+
+#### 9. Error Message Actionability
+
+```javascript
+(() => {
+  const errorEls = deepQuerySelectorAll('[class*="error"], [role="alert"], [class*="invalid"], [class*="err-msg"], [class*="field-error"]');
+  const fieldKeywords = ['email', 'password', 'name', 'phone', 'address', 'username', 'date', 'number', 'url', 'file', 'card', 'zip', 'code', 'amount'];
+  const fixKeywords = ['must', 'should', 'at least', 'format', 'characters', 'required', 'enter', 'provide', 'choose', 'select', 'between', 'minimum', 'maximum', 'valid', 'cannot', 'too short', 'too long'];
+
+  const results = [];
+  let actionableCount = 0;
+
+  errorEls.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (el.textContent || '').trim().toLowerCase();
+    if (!text || text.length < 2) return;
+
+    const hasFieldName = fieldKeywords.some(kw => text.includes(kw));
+    const hasFixGuidance = fixKeywords.some(kw => text.includes(kw));
+    const isActionable = hasFieldName && hasFixGuidance;
+
+    // Measure distance to nearest input
+    const inputs = deepQuerySelectorAll('input, select, textarea');
+    let minDistance = Infinity;
+    inputs.forEach(input => {
+      const iRect = input.getBoundingClientRect();
+      if (iRect.width === 0) return;
+      const dx = rect.left - iRect.left;
+      const dy = rect.top - iRect.bottom;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDistance) minDistance = dist;
+    });
+
+    if (isActionable) actionableCount++;
+    results.push({
+      text: text.substring(0, 80),
+      hasFieldName,
+      hasFixGuidance,
+      isActionable,
+      distanceToInput: minDistance === Infinity ? null : Math.round(minDistance)
+    });
+  });
+
+  const total = results.length;
+  const grade = total === 0 ? 'good' : (actionableCount === total) ? 'good' : (actionableCount >= total / 2) ? 'warning' : 'bad';
+  return { check: 'error_message_actionability', total, actionableCount, details: results.slice(0, 10), grade };
+})()
+```
+
+#### 10. Default State Ambiguity Pre-filter `[J with pre-filter]`
+
+```javascript
+(() => {
+  const flagged = [];
+
+  // Toggles without aria-checked
+  const toggles = deepQuerySelectorAll('[role="switch"], [role="checkbox"], [class*="toggle"]');
+  toggles.forEach(t => {
+    if (!t.getAttribute('aria-checked')) {
+      flagged.push({ type: 'toggle-no-aria-checked', text: (t.textContent || '').trim().substring(0, 40) });
+    }
+  });
+
+  // Radio groups with no default
+  const radioGroups = {};
+  const radios = deepQuerySelectorAll('input[type="radio"]');
+  radios.forEach(r => {
+    const name = r.name || 'unnamed';
+    if (!radioGroups[name]) radioGroups[name] = { total: 0, checked: 0 };
+    radioGroups[name].total++;
+    if (r.checked) radioGroups[name].checked++;
+  });
+  Object.entries(radioGroups).forEach(([name, group]) => {
+    if (group.checked === 0) {
+      flagged.push({ type: 'radio-no-default', name, count: group.total });
+    }
+  });
+
+  // Selects with placeholder first option
+  const selects = deepQuerySelectorAll('select');
+  selects.forEach(sel => {
+    const first = sel.options && sel.options[0];
+    if (first && (first.value === '' || first.disabled)) {
+      const isSelected = sel.selectedIndex === 0;
+      if (isSelected) {
+        flagged.push({ type: 'select-placeholder-selected', text: first.textContent.trim().substring(0, 40) });
+      }
+    }
+  });
+
+  // Buttons with same background as parent
+  const buttons = deepQuerySelectorAll('button, [role="button"]');
+  buttons.forEach(btn => {
+    const rect = btn.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const btnBg = getComputedStyle(btn).backgroundColor;
+    const parent = btn.parentElement;
+    if (!parent) return;
+    const parentBg = getComputedStyle(parent).backgroundColor;
+    if (btnBg === parentBg && btnBg !== 'rgba(0, 0, 0, 0)') {
+      flagged.push({ type: 'button-blends-with-parent', text: (btn.textContent || '').trim().substring(0, 40) });
+    }
+  });
+
+  return { check: 'default_state_ambiguity_prefilter', flaggedCount: flagged.length, details: flagged.slice(0, 20), note: 'Requires LLM review for final judgment' };
+})()
+```
+
+#### 11. Tooltip Coverage Pre-filter `[J with pre-filter]`
+
+```javascript
+(() => {
+  const flagged = [];
+
+  // Icon-only buttons without title/aria-label/data-tooltip
+  const buttons = deepQuerySelectorAll('button, [role="button"]');
+  buttons.forEach(btn => {
+    const rect = btn.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (btn.textContent || '').trim();
+    const hasSvgOrImg = btn.querySelector('svg, img, [class*="icon"]') !== null;
+    const hasTitle = btn.getAttribute('title') || btn.getAttribute('aria-label') || btn.getAttribute('data-tooltip');
+    if (hasSvgOrImg && text.length <= 1 && !hasTitle) {
+      flagged.push({ type: 'icon-button-no-tooltip', html: btn.outerHTML.substring(0, 80) });
+    }
+  });
+
+  // Truncated text without title
+  const textEls = deepQuerySelectorAll('span, p, td, th, div, a, li');
+  textEls.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    if (el.scrollWidth > el.clientWidth + 2) {
+      const hasTitle = el.getAttribute('title');
+      if (!hasTitle) {
+        flagged.push({ type: 'truncated-no-title', text: (el.textContent || '').trim().substring(0, 50) });
+      }
+    }
+  });
+
+  // Abbreviations without title
+  const abbrs = deepQuerySelectorAll('abbr');
+  abbrs.forEach(abbr => {
+    if (!abbr.getAttribute('title')) {
+      flagged.push({ type: 'abbr-no-title', text: (abbr.textContent || '').trim() });
+    }
+  });
+
+  return { check: 'tooltip_coverage_prefilter', flaggedCount: flagged.length, details: flagged.slice(0, 20), note: 'Requires LLM review for final judgment' };
+})()
+```
+
+#### 12. Z-index Stacking Pre-filter `[J with pre-filter]`
+
+```javascript
+(() => {
+  const findings = [];
+  const els = document.querySelectorAll('*');
+  const zValues = [];
+
+  els.forEach(el => {
+    const style = getComputedStyle(el);
+    const zIndex = parseInt(style.zIndex);
+    if (isNaN(zIndex) || style.position === 'static') return;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    zValues.push({ el, zIndex, rect, classes: (el.className || '').toString().substring(0, 60) });
+
+    if (zIndex > 9999) {
+      findings.push({ type: 'extreme-z-index', zIndex, classes: (el.className || '').toString().substring(0, 60) });
+    }
+  });
+
+  // Check for overlay elements with lower z-index than content
+  const overlayKeywords = ['overlay', 'modal', 'backdrop', 'drawer', 'popover', 'dropdown'];
+  zValues.forEach(item => {
+    const cls = item.classes.toLowerCase();
+    const isOverlay = overlayKeywords.some(kw => cls.includes(kw));
+    if (!isOverlay) return;
+
+    zValues.forEach(other => {
+      if (other === item) return;
+      const otherCls = other.classes.toLowerCase();
+      const isContent = !overlayKeywords.some(kw => otherCls.includes(kw));
+      if (isContent && other.zIndex > item.zIndex) {
+        const overlaps = !(item.rect.right < other.rect.left || item.rect.left > other.rect.right ||
+                           item.rect.bottom < other.rect.top || item.rect.top > other.rect.bottom);
+        if (overlaps) {
+          findings.push({
+            type: 'overlay-under-content',
+            overlayZ: item.zIndex, overlayClass: item.classes,
+            contentZ: other.zIndex, contentClass: other.classes
+          });
+        }
+      }
+    });
+  });
+
+  return { check: 'z_index_stacking_prefilter', findingCount: findings.length, maxZ: zValues.length > 0 ? Math.max(...zValues.map(v => v.zIndex)) : 0, details: findings.slice(0, 15), note: 'Requires LLM review for final judgment' };
+})()
+```
+
+#### 13. Active/Pressed State Feedback
+
+```javascript
+(() => {
+  const interactiveSelectors = ['button', 'a', '[role="button"]', 'input[type="submit"]', 'input[type="button"]', '[role="tab"]', '[role="menuitem"]'];
+  const interactiveEls = deepQuerySelectorAll(interactiveSelectors.join(', '));
+
+  let totalVisible = 0;
+  let withCursorPointer = 0;
+  let withTransition = 0;
+
+  interactiveEls.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    totalVisible++;
+
+    const style = getComputedStyle(el);
+    if (style.cursor === 'pointer') withCursorPointer++;
+    if (style.transition && style.transition !== 'none' && style.transition !== 'all 0s ease 0s') withTransition++;
+  });
+
+  // Check stylesheets for :active rules
+  let activeRuleCount = 0;
+  try {
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules || []) {
+          if (rule.selectorText && rule.selectorText.includes(':active')) {
+            activeRuleCount++;
+          }
+        }
+      } catch (e) { /* cross-origin stylesheet */ }
+    }
+  } catch (e) { /* no access */ }
+
+  const cursorPct = totalVisible > 0 ? Math.round((withCursorPointer / totalVisible) * 100) : 100;
+  const transitionPct = totalVisible > 0 ? Math.round((withTransition / totalVisible) * 100) : 100;
+  const coveragePct = Math.round((cursorPct + transitionPct) / 2);
+  const grade = coveragePct >= 100 ? 'good' : coveragePct >= 80 ? 'warning' : 'bad';
+
+  return { check: 'active_pressed_state_feedback', totalVisible, withCursorPointer, withTransition, activeRuleCount, cursorPct, transitionPct, coveragePct, grade };
+})()
+```
+
+#### 14. Error Recovery Path
+
+```javascript
+(() => {
+  const errorContainers = deepQuerySelectorAll('[class*="error"], [role="alert"], [class*="fail"], [class*="404"], [class*="500"]');
+  const results = [];
+  let withRecoveryCount = 0;
+
+  errorContainers.forEach(container => {
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const text = (container.textContent || '').trim();
+    if (!text || text.length < 3) return;
+
+    // Check for recovery elements inside the error container
+    const retryBtn = container.querySelector('button, [role="button"]');
+    const navLink = container.querySelector('a[href]');
+    const editableField = container.querySelector('input, select, textarea');
+
+    // Also check siblings and parent for recovery elements
+    const parent = container.parentElement;
+    let nearbyRetry = false;
+    let nearbyLink = false;
+    let nearbyField = false;
+    if (parent) {
+      nearbyRetry = parent.querySelector('button[class*="retry"], button[class*="try-again"], [class*="retry"]') !== null;
+      nearbyLink = parent.querySelector('a[href]:not([href="#"])') !== null;
+      nearbyField = parent.querySelector('input:not([type="hidden"]), select, textarea') !== null;
+    }
+
+    const hasRecovery = !!(retryBtn || navLink || editableField || nearbyRetry || nearbyLink || nearbyField);
+    if (hasRecovery) withRecoveryCount++;
+
+    results.push({
+      text: text.substring(0, 60),
+      hasRetryBtn: !!(retryBtn || nearbyRetry),
+      hasNavLink: !!(navLink || nearbyLink),
+      hasEditableField: !!(editableField || nearbyField),
+      hasRecovery
+    });
+  });
+
+  const total = results.length;
+  const grade = total === 0 ? 'good' : (withRecoveryCount === total) ? 'good' : (withRecoveryCount >= total / 2) ? 'warning' : 'bad';
+  return { check: 'error_recovery_path', total, withRecoveryCount, details: results.slice(0, 10), grade };
+})()
+```
+
+#### 15. Success Confirmation Infrastructure
+
+```javascript
+(() => {
+  // Detect toast/snackbar containers
+  const toastContainers = deepQuerySelectorAll('[class*="toast"], [class*="Toaster"], [class*="snackbar"], [class*="Snackbar"], [class*="notification-container"], [id*="toast"], [class*="notistack"]');
+
+  // Detect ARIA live regions
+  const statusRegions = deepQuerySelectorAll('[role="status"], [aria-live="polite"], [aria-live="assertive"]');
+
+  // Check forms for adjacent success elements
+  const forms = deepQuerySelectorAll('form');
+  let formsWithSuccessInfra = 0;
+  forms.forEach(form => {
+    const rect = form.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const parent = form.parentElement;
+    if (!parent) return;
+    const successEl = parent.querySelector('[class*="success"], [class*="confirm"], [role="status"]');
+    if (successEl) formsWithSuccessInfra++;
+  });
+
+  const hasToasts = toastContainers.length > 0;
+  const hasStatusRegions = statusRegions.length > 0;
+  const hasInfrastructure = hasToasts || hasStatusRegions;
+
+  const grade = hasInfrastructure ? 'good' : forms.length === 0 ? 'good' : 'bad';
+  return {
+    check: 'success_confirmation_infrastructure',
+    toastContainers: toastContainers.length,
+    statusRegions: statusRegions.length,
+    formsChecked: forms.length,
+    formsWithSuccessInfra,
+    hasInfrastructure,
+    grade
+  };
 })()
 ```
 
