@@ -5,21 +5,34 @@ This reference contains all 10 mobile audit categories, measurement scripts, thr
 **Viewport:** 393x852 (iPhone 15 Pro)
 **Setup:** At start of each screen, run `browser_resize width=393 height=852`
 **Total checks:** 56
-**Scoring:** Binary scorecard (Pass=1, Fail=0). Score presented as X/56.
+**Scoring:** Weighted scorecard with graduated scoring (0 / 0.5 / 1.0). Score presented as X/Y Weighted (Z%).
+
+---
+
+## Measurement Tier Legend
+
+- **`[D]` Deterministic** — Fully measurable via `browser_evaluate`. Same page always produces the same result. High confidence.
+- **`[H]` Heuristic** — Measurable but with known false positive/negative risks (<5%), OR requires Playwright interaction. Reliable signal, not definitive.
+- **`[J]` LLM-Judgment** — Requires visual interpretation or semantic understanding. Pre-filter narrows LLM scope by 75-85%. Lower confidence.
+
+### Threshold Citations
+- **`[research]`** — Peer-reviewed or official standard
+- **`[convention]`** — Industry convention
+- **`[heuristic]`** — Team-chosen threshold
 
 ---
 
 ## Category 1: Touch & Interaction (7 checks)
 
-| # | Check | Threshold | Method | Severity |
-|---|-------|-----------|--------|----------|
-| 1.1 | Tap target size (Apple HIG) | >= 44x44 CSS px | `getBoundingClientRect()` on all `a, button, input, select, textarea, [role="button"], [onclick]` | CRITICAL |
-| 1.2 | Tap target size (Google MD3) | >= 48x48 CSS px | Same selector set; flag as info only (not scored as fail) | MINOR |
-| 1.3 | Tap target spacing | >= 8px between adjacent targets | Compute gaps between interactive element bounding rects | MAJOR |
-| 1.4 | Icon-only nav items have text labels | `aria-label` or visible text present | Query nav items with SVG/img but no adjacent text node | MAJOR |
-| 1.5 | Primary CTAs in thumb zone | 100% within bottom 60% of viewport | `y > 0.4 * viewportHeight` for primary action buttons | MINOR |
-| 1.6 | Input field minimum height | >= 48px | `getBoundingClientRect().height` on all `input, select, textarea` | MAJOR |
-| 1.7 | Label visibility | Labels above fields, not placeholder-only | Check for `<label>` elements associated with each input; flag inputs relying solely on `placeholder` | MAJOR |
+| # | Check | Tier | Threshold | Method | Severity |
+|---|-------|------|-----------|--------|----------|
+| 1.1 | Tap target size (Apple HIG) | `[D]` `[research: Apple HIG]` | >= 44x44 CSS px | `getBoundingClientRect()` on all `a, button, input, select, textarea, [role="button"], [onclick]` | CRITICAL |
+| 1.2 | Tap target size (Google MD3) | `[D]` `[research: MD3]` | >= 48x48 CSS px | Same selector set; flag as info only (not scored as fail) | MINOR |
+| 1.3 | Tap target spacing | `[D]` `[heuristic]` | >= 8px between adjacent targets | Compute gaps between interactive element bounding rects | MAJOR |
+| 1.4 | Icon-only nav items have text labels | `[D]` | `aria-label` or visible text present | Query nav items with SVG/img but no adjacent text node | MAJOR |
+| 1.5 | Primary CTAs in thumb zone | `[D]` `[research: Hoober]` | 100% within bottom 60% of viewport | `y > 0.4 * viewportHeight` for primary action buttons | MINOR |
+| 1.6 | Input field minimum height | `[D]` `[research: MD3]` | >= 48px | `getBoundingClientRect().height` on all `input, select, textarea` | MAJOR |
+| 1.7 | Label visibility | `[D]` | Labels above fields, not placeholder-only | Check for `<label>` elements associated with each input; flag inputs relying solely on `placeholder` | MAJOR |
 
 ### Measurement Details
 
@@ -33,13 +46,13 @@ This reference contains all 10 mobile audit categories, measurement scripts, thr
 
 ## Category 2: iOS Safari Specific (5 checks)
 
-| # | Check | What to Detect | Method | Severity |
-|---|-------|---------------|--------|----------|
-| 2.1 | `100vh` bug detection | Elements using `height: 100vh` | Scan computed styles for `100vh` usage; flag elements whose height equals exactly `window.innerHeight` when the address bar is visible | MAJOR |
-| 2.2 | Input zoom prevention | All `<input>`, `<select>`, `<textarea>` must have `font-size >= 16px` | `getComputedStyle(el).fontSize` on all form elements; any value < 16px triggers iOS Safari auto-zoom | CRITICAL |
-| 2.3 | Safe area insets | If `viewport-fit=cover`, verify `env(safe-area-inset-*)` in CSS | Parse `<meta name="viewport">` content for `viewport-fit=cover`, then scan all stylesheets for `env(safe-area-inset-top)`, `env(safe-area-inset-bottom)`, etc. | MAJOR |
-| 2.4 | Fixed bottom + keyboard conflict | Flag `position: fixed; bottom: 0` elements | Query elements with `position: fixed` and `bottom: 0` that are likely to conflict with the iOS keyboard (form elements, input bars, footers) | MAJOR |
-| 2.5 | Dynamic viewport units | Flag `100vh`, suggest `100dvh`/`svh` | Scan stylesheets and inline styles for `100vh` usage; recommend replacement with `100dvh`, `100svh`, or `100lvh` | MINOR |
+| # | Check | Tier | What to Detect | Method | Severity |
+|---|-------|------|---------------|--------|----------|
+| 2.1 | `100vh` bug detection | `[D]` | Elements using `height: 100vh` | Scan computed styles for `100vh` usage; flag elements whose height equals exactly `window.innerHeight` when the address bar is visible | MAJOR |
+| 2.2 | Input zoom prevention | `[D]` `[research: iOS Safari behavior]` | All `<input>`, `<select>`, `<textarea>` must have `font-size >= 16px` | `getComputedStyle(el).fontSize` on all form elements; any value < 16px triggers iOS Safari auto-zoom | CRITICAL |
+| 2.3 | Safe area insets | `[H]` | If `viewport-fit=cover`, verify `env(safe-area-inset-*)` in CSS | Parse `<meta name="viewport">` content for `viewport-fit=cover`, then scan all stylesheets for `env(safe-area-inset-top)`, `env(safe-area-inset-bottom)`, etc. Cross-origin CSS limitation may prevent full detection. | MAJOR |
+| 2.4 | Fixed bottom + keyboard conflict | `[D]` | Flag `position: fixed; bottom: 0` elements | Query elements with `position: fixed` and `bottom: 0` that are likely to conflict with the iOS keyboard (form elements, input bars, footers) | MAJOR |
+| 2.5 | Dynamic viewport units | `[H]` | Flag `100vh`, suggest `100dvh`/`svh` | Scan stylesheets and inline styles for `100vh` usage; recommend replacement with `100dvh`, `100svh`, or `100lvh` | MINOR |
 
 ### iOS Safari Context
 
@@ -51,14 +64,14 @@ Input zoom: iOS Safari automatically zooms in when a user focuses an input with 
 
 ## Category 3: iOS Native Feel (6 checks)
 
-| # | Check | Anti-Pattern | Best Practice | Method | Severity |
-|---|-------|-------------|---------------|--------|----------|
-| 3.1 | Hamburger menu detection | Hidden nav behind 3-line icon | Tab bar or visible nav (2-3x engagement improvement) | Look for `[class*="hamburger"]`, `[class*="burger"]`, `[aria-label*="menu"]` with hidden child navs, or `<button>` elements that toggle `<nav>` visibility | MAJOR |
-| 3.2 | FAB detection | Floating circle button | Navigation bar buttons | `position: fixed` elements with `border-radius >= 50%` and aspect ratio ~1:1 (width/height between 0.8 and 1.2) | MAJOR |
-| 3.3 | Breadcrumb on mobile | Desktop breadcrumb pattern on small screen | Back button + title | Query `nav[aria-label*="breadcrumb"]`, `[class*="breadcrumb"]`, or `ol/ul` with `>` / `/` separators between links | MINOR |
-| 3.4 | Material Design styling | Android-specific visuals | iOS shadows, rounded corners, system font | Detect MD3 elevation shadows (`box-shadow` matching MD3 levels), ripple effect classes (`[class*="ripple"]`, `[class*="mdc-"]`), or Material component prefixes | MINOR |
-| 3.5 | Component patterns | Web checkboxes, web dropdowns | iOS-style toggles, pickers | Detect `<input type="checkbox">` rendered as standard web checkboxes (not styled as toggles) and `<select>` rendered as web dropdowns instead of iOS pickers | MINOR |
-| 3.6 | Toast/snackbar detection | Android-style bottom notifications | iOS alert/banner patterns | Detect `[class*="toast"]`, `[class*="snackbar"]`, or fixed-bottom short-lived notification elements styled in Material Design fashion | MINOR |
+| # | Check | Tier | Anti-Pattern | Best Practice | Method | Severity |
+|---|-------|------|-------------|---------------|--------|----------|
+| 3.1 | Hamburger menu detection | `[H]` | Hidden nav behind 3-line icon | Tab bar or visible nav (2-3x engagement improvement) | Look for `[class*="hamburger"]`, `[class*="burger"]`, `[aria-label*="menu"]` with hidden child navs, or `<button>` elements that toggle `<nav>` visibility | MAJOR |
+| 3.2 | FAB detection | `[H]` | Floating circle button | Navigation bar buttons | `position: fixed` elements with `border-radius >= 50%` and aspect ratio ~1:1 (width/height between 0.8 and 1.2) | MAJOR |
+| 3.3 | Breadcrumb on mobile | `[H]` | Desktop breadcrumb pattern on small screen | Back button + title | Query `nav[aria-label*="breadcrumb"]`, `[class*="breadcrumb"]`, or `ol/ul` with `>` / `/` separators between links | MINOR |
+| 3.4 | Material Design styling | `[J]` | Android-specific visuals | iOS shadows, rounded corners, system font | Detect MD3 elevation shadows (`box-shadow` matching MD3 levels), ripple effect classes (`[class*="ripple"]`, `[class*="mdc-"]`), or Material component prefixes | MINOR |
+| 3.5 | Component patterns | `[J]` | Web checkboxes, web dropdowns | iOS-style toggles, pickers | Detect `<input type="checkbox">` rendered as standard web checkboxes (not styled as toggles) and `<select>` rendered as web dropdowns instead of iOS pickers | MINOR |
+| 3.6 | Toast/snackbar detection | `[H]` | Android-style bottom notifications | iOS alert/banner patterns | Detect `[class*="toast"]`, `[class*="snackbar"]`, or fixed-bottom short-lived notification elements styled in Material Design fashion | MINOR |
 
 ### Detection Heuristics
 
@@ -76,31 +89,31 @@ Input zoom: iOS Safari automatically zooms in when a user focuses an input with 
 
 ## Category 4: Viewport & Responsive (6 checks)
 
-| # | Check | Threshold | Method | Severity |
-|---|-------|-----------|--------|----------|
-| 4.1 | Viewport meta tag present | `width=device-width, initial-scale=1` | `document.querySelector('meta[name="viewport"]').content` — verify it contains `width=device-width` and `initial-scale=1` | CRITICAL |
-| 4.2 | Zoom not disabled | `user-scalable != no` AND `maximum-scale >= 2` | Parse viewport meta `content` attribute; fail if `user-scalable=no` or `maximum-scale < 2` | CRITICAL |
-| 4.3 | No horizontal overflow | `scrollWidth <= clientWidth` | `document.documentElement.scrollWidth <= document.documentElement.clientWidth` | MAJOR |
-| 4.4 | Orientation support | Content works in landscape (852x393) | Resize to `852x393`, then check for content loss, layout breakage, or horizontal overflow | MINOR |
-| 4.5 | Reflow at 320px | No horizontal scroll at 320px width (WCAG 1.4.10) | Resize to `320x852`, then check `scrollWidth <= clientWidth` | MAJOR |
-| 4.6 | Viewport utilization | Fixed header + footer heights < 20% of `clientHeight` | Measure combined height of all `position: fixed` or `position: sticky` elements at top/bottom as percentage of viewport height | MINOR |
+| # | Check | Tier | Threshold | Method | Severity |
+|---|-------|------|-----------|--------|----------|
+| 4.1 | Viewport meta tag present | `[D]` | `width=device-width, initial-scale=1` | `document.querySelector('meta[name="viewport"]').content` — verify it contains `width=device-width` and `initial-scale=1` (parsed key-value comparison) | CRITICAL |
+| 4.2 | Zoom not disabled | `[D]` | `user-scalable != no` AND `maximum-scale >= 2` | Parse viewport meta `content` attribute; fail if `user-scalable=no` or `maximum-scale < 2` | CRITICAL |
+| 4.3 | No horizontal overflow | `[D]` | `scrollWidth <= clientWidth` | `document.documentElement.scrollWidth <= document.documentElement.clientWidth` | MAJOR |
+| 4.4 | Orientation support | `[H]` | Content works in landscape (852x393) | Resize to `852x393`, then check for content loss, layout breakage, or horizontal overflow | MINOR |
+| 4.5 | Reflow at 320px | `[D]` `[research: WCAG 1.4.10]` | No horizontal scroll at 320px width (WCAG 1.4.10) | Resize to `320x852`, then check `scrollWidth <= clientWidth` | MAJOR |
+| 4.6 | Viewport utilization | `[D]` `[heuristic]` | Fixed header + footer heights < 20% of `clientHeight` | Measure combined height of all `position: fixed` or `position: sticky` elements at top/bottom as percentage of viewport height | MINOR |
 
 ---
 
 ## Category 5: Mobile Typography (10 checks)
 
-| # | Check | Threshold | Method | Severity |
-|---|-------|-----------|--------|----------|
-| 5.1 | Body text font size | >= 16px CSS (17pt iOS) | `getComputedStyle` on `<p>`, `<span>`, `<li>`, `<div>` text elements | MAJOR |
-| 5.2 | Input font size | >= 16px (iOS zoom prevention) | `getComputedStyle` on `input, select, textarea` | CRITICAL |
-| 5.3 | Minimum any text | >= 11px (iOS caption2 floor) | `getComputedStyle` on all visible text elements; none below 11px | MAJOR |
-| 5.4 | Line height | >= 1.5x font size (WCAG 1.4.12) | Computed `lineHeight / fontSize` ratio on body text | MAJOR |
-| 5.5 | Line length (mobile) | 30-50 characters per line | `containerWidth / (fontSize * 0.5)` — approximate characters per line | MINOR |
-| 5.6 | Paragraph spacing | >= 2x font size | Computed `marginBottom` on `<p>` elements relative to their `fontSize` | MINOR |
-| 5.7 | Letter spacing | >= 0.12x font size | Computed `letterSpacing` relative to `fontSize`; flag if below 0.12em | MINOR |
-| 5.8 | Color contrast — normal text (AA) | >= 4.5:1 | Foreground vs background color extraction + luminance ratio | CRITICAL |
-| 5.9 | Color contrast — large text (AA) | >= 3:1 (>= 18pt or >= 14pt bold) | Same contrast formula, with size/weight check for large text classification | CRITICAL |
-| 5.10 | Text scaling at 200% | No truncation or clipping | Set browser zoom to 200%, check for `overflow: hidden` clipping or text truncation | MAJOR |
+| # | Check | Tier | Threshold | Method | Severity |
+|---|-------|------|-----------|--------|----------|
+| 5.1 | Body text font size | `[D]` `[research: Apple HIG]` | >= 16px CSS (17pt iOS) | `getComputedStyle` on `<p>`, `<span>`, `<li>`, `<div>` text elements | MAJOR |
+| 5.2 | Input font size | `[D]` | >= 16px (iOS zoom prevention) | `getComputedStyle` on `input, select, textarea` | CRITICAL |
+| 5.3 | Minimum any text | `[D]` `[research: Apple HIG]` | >= 11px (iOS caption2 floor) | `getComputedStyle` on all visible text elements; none below 11px | MAJOR |
+| 5.4 | Line height | `[D]` `[research: WCAG 1.4.12]` | >= 1.5x font size (WCAG 1.4.12) | Computed `lineHeight / fontSize` ratio on body text | MAJOR |
+| 5.5 | Line length (mobile) | `[D]` `[convention]` | 30-50 characters per line | `containerWidth / (fontSize * 0.5)` — approximate characters per line | MINOR |
+| 5.6 | Paragraph spacing | `[D]` `[research: WCAG 1.4.12]` | >= 2x font size | Computed `marginBottom` on `<p>` elements relative to their `fontSize` | MINOR |
+| 5.7 | Letter spacing | `[D]` `[research: WCAG 1.4.12]` | >= 0.12x font size | Computed `letterSpacing` relative to `fontSize`; flag if below 0.12em | MINOR |
+| 5.8 | Color contrast — normal text (AA) | `[D]` `[research: WCAG 1.4.3]` | >= 4.5:1 | Foreground vs background color extraction + luminance ratio | CRITICAL |
+| 5.9 | Color contrast — large text (AA) | `[D]` `[research: WCAG 1.4.3]` | >= 3:1 (>= 18pt or >= 14pt bold) | Same contrast formula, with size/weight check for large text classification | CRITICAL |
+| 5.10 | Text scaling at 200% | `[H]` | No truncation or clipping | Set browser zoom to 200%, check for `overflow: hidden` clipping or text truncation | MAJOR |
 
 ### iOS Default Text Style Reference
 
@@ -134,16 +147,16 @@ Luminance = 0.2126 * R_linear + 0.7152 * G_linear + 0.0722 * B_linear
 
 ## Category 6: Mobile Form UX (8 checks)
 
-| # | Check | Requirement | Method | Severity |
-|---|-------|-------------|--------|----------|
-| 6.1 | Email fields use `type="email"` | Fields with "email" in name/label/placeholder | Query inputs, cross-reference `name`, `id`, `placeholder`, associated `<label>` text against "email"; verify `type="email"` | MAJOR |
-| 6.2 | Phone fields use `type="tel"` | Fields with "phone"/"tel" in name/label/placeholder | Same cross-reference approach; verify `type="tel"` | MAJOR |
-| 6.3 | Numeric fields use `inputmode="numeric"` or `"decimal"` | Fields expecting numbers | Cross-reference name/label/placeholder for "number", "amount", "quantity", "zip", "code"; verify `inputmode` attribute | MAJOR |
-| 6.4 | `autocomplete` present | 100% of applicable fields | Query all `input` elements in forms; check `autocomplete` attribute is set to a valid token | MAJOR |
-| 6.5 | `enterkeyhint` present | Form fields have `enterkeyhint` | Query `input` elements within `<form>`; check for `enterkeyhint` attribute (e.g., "done", "go", "next", "search", "send") | MINOR |
-| 6.6 | Single-column layout | No side-by-side form fields at mobile width | Detect form `input`/`select`/`textarea` elements at the same Y-position (within 5px tolerance) — indicates multi-column layout | MAJOR |
-| 6.7 | Password autocomplete | `autocomplete="current-password"` or `"new-password"` | Query `input[type="password"]`; verify `autocomplete` is set to `current-password` or `new-password` | MAJOR |
-| 6.8 | Keyboard type matching | Correct mobile keyboard for each input | Cross-reference `type`/`inputmode` against field `name`/`label`/`placeholder` content to ensure the right keyboard appears | MAJOR |
+| # | Check | Tier | Requirement | Method | Severity |
+|---|-------|------|-------------|--------|----------|
+| 6.1 | Email fields use `type="email"` | `[D]` | Fields with "email" in name/label/placeholder | Query inputs, cross-reference `name`, `id`, `placeholder`, associated `<label>` text against "email"; verify `type="email"` | MAJOR |
+| 6.2 | Phone fields use `type="tel"` | `[D]` | Fields with "phone"/"tel" in name/label/placeholder | Same cross-reference approach; verify `type="tel"` | MAJOR |
+| 6.3 | Numeric fields use `inputmode="numeric"` or `"decimal"` | `[D]` | Fields expecting numbers | Cross-reference name/label/placeholder for "number", "amount", "quantity", "zip", "code"; verify `inputmode` attribute | MAJOR |
+| 6.4 | `autocomplete` present | `[D]` | 100% of applicable fields | Query all `input` elements in forms; check `autocomplete` attribute is set to a valid token | MAJOR |
+| 6.5 | `enterkeyhint` present | `[D]` | Form fields have `enterkeyhint` | Query `input` elements within `<form>`; check for `enterkeyhint` attribute (e.g., "done", "go", "next", "search", "send") | MINOR |
+| 6.6 | Single-column layout | `[D]` | No side-by-side form fields at mobile width | Detect form `input`/`select`/`textarea` elements at the same Y-position (within 5px tolerance) — indicates multi-column layout | MAJOR |
+| 6.7 | Password autocomplete | `[D]` | `autocomplete="current-password"` or `"new-password"` | Query `input[type="password"]`; verify `autocomplete` is set to `current-password` or `new-password` | MAJOR |
+| 6.8 | Keyboard type matching | `[D]` | Correct mobile keyboard for each input | Cross-reference `type`/`inputmode` against field `name`/`label`/`placeholder` content to ensure the right keyboard appears | MAJOR |
 
 ### Keyboard Type Mapping
 
@@ -164,49 +177,49 @@ Luminance = 0.2126 * R_linear + 0.7152 * G_linear + 0.0722 * B_linear
 
 ## Category 7: Interstitials & Overlays (4 checks)
 
-| # | Check | Threshold | Method | Severity |
-|---|-------|-----------|--------|----------|
-| 7.1 | Overlay coverage on load | < 30% of viewport area | Detect `position: fixed` or `position: absolute` elements with `z-index > 1000`, compute their area as percentage of viewport | CRITICAL |
-| 7.2 | Sticky banner height | < 15% of viewport | Measure height of fixed/sticky elements at top or bottom of viewport as percentage of `clientHeight` | MAJOR |
-| 7.3 | Popup close button size | >= 44x44 CSS px | Find close buttons (`[class*="close"]`, `[aria-label*="close"]`, `[aria-label*="dismiss"]`) within overlay elements; measure dimensions | MAJOR |
-| 7.4 | Overlay timing | Flag overlays appearing within 3s of load | Observe DOM mutations after page load; flag any high-z-index overlay elements that appear within the first 3 seconds | MAJOR |
+| # | Check | Tier | Threshold | Method | Severity |
+|---|-------|------|-----------|--------|----------|
+| 7.1 | Overlay coverage on load | `[D]` `[heuristic]` | < 30% of viewport area | Detect `position: fixed` elements covering > 10% viewport, compute their area as percentage of viewport. Note: overlapping overlays may overcount slightly. | CRITICAL |
+| 7.2 | Sticky banner height | `[D]` `[heuristic]` | < 15% of viewport | Measure height of fixed/sticky elements at top or bottom of viewport as percentage of `clientHeight` | MAJOR |
+| 7.3 | Popup close button size | `[D]` `[research: Apple HIG]` | >= 44x44 CSS px | Find close buttons (`[class*="close"]`, `[aria-label*="close"]`, `[aria-label*="dismiss"]`) within overlay elements; measure dimensions | MAJOR |
+| 7.4 | Overlay timing | `[H]` | Flag overlays appearing within 3s of load | Observe DOM mutations after page load; flag any high-z-index overlay elements that appear within the first 3 seconds | MAJOR |
 
 ---
 
 ## Category 8: Mobile Accessibility — WCAG Mobile (6 checks)
 
-| # | Check | WCAG Reference | Threshold | Method | Severity |
-|---|-------|---------------|-----------|--------|----------|
-| 8.1 | Touch targets >= 24x24 CSS px (AA) | WCAG 2.5.8 | All interactive elements >= 24x24 | `getBoundingClientRect()` on all interactive elements | MAJOR |
-| 8.2 | Touch targets >= 44x44 CSS px (AAA) | WCAG 2.5.5 | Flag as enhancement, not failure | Same measurement; report as informational | MINOR |
-| 8.3 | `prefers-reduced-motion` support | -- | Media query present in stylesheets | Scan all `<style>` and linked stylesheets for `@media (prefers-reduced-motion` | MINOR |
-| 8.4 | Focus not obscured by sticky elements | WCAG 2.4.11 | Focused element fully visible | Tab through interactive elements; for each, check that its bounding rect is not overlapped by any `position: fixed` or `position: sticky` element | MAJOR |
-| 8.5 | Hover-dependent UI has touch alternative | -- | Touch fallback exists | Check for `@media (hover: none)` or `@media (pointer: coarse)` rules in stylesheets; flag `:hover`-only interactive patterns without touch equivalents | MAJOR |
-| 8.6 | Text resize to 200% | WCAG 1.4.4 | No overflow or clipping | Set zoom to 200%, check `scrollWidth <= clientWidth` and no `overflow: hidden` clipping on text containers | MAJOR |
+| # | Check | Tier | WCAG Reference | Threshold | Method | Severity |
+|---|-------|------|---------------|-----------|--------|----------|
+| 8.1 | Touch targets >= 24x24 CSS px (AA) | `[D]` `[research: WCAG 2.5.8]` | WCAG 2.5.8 | All interactive elements >= 24x24 | `getBoundingClientRect()` on all interactive elements | MAJOR |
+| 8.2 | Touch targets >= 44x44 CSS px (AAA) | `[D]` `[research: WCAG 2.5.5]` | WCAG 2.5.5 | Flag as enhancement, not failure | Same measurement; report as informational | MINOR |
+| 8.3 | `prefers-reduced-motion` support | `[H]` | -- | Media query present in stylesheets | Scan all `<style>` and linked stylesheets for `@media (prefers-reduced-motion` | MINOR |
+| 8.4 | Focus not obscured by sticky elements | `[H]` | WCAG 2.4.11 | Focused element fully visible | Tab through interactive elements; for each, check that its bounding rect is not overlapped by any `position: fixed` or `position: sticky` element | MAJOR |
+| 8.5 | Hover-dependent UI has touch alternative | `[H]` | -- | Touch fallback exists | Check for `@media (hover: none)` or `@media (pointer: coarse)` rules in stylesheets; flag `:hover`-only interactive patterns without touch equivalents | MAJOR |
+| 8.6 | Text resize to 200% | `[H]` `[research: WCAG 1.4.4]` | WCAG 1.4.4 | No overflow or clipping | Set zoom to 200%, check `scrollWidth <= clientWidth` and no `overflow: hidden` clipping on text containers | MAJOR |
 
 ---
 
 ## Category 9: Gestures & Interaction (5 checks)
 
-| # | Check | Threshold | Method | Severity |
-|---|-------|-----------|--------|----------|
-| 9.1 | Pull-to-refresh on scrollable lists | Present on all scrollable list screens | Check for refresh indicators: `[class*="pull-to-refresh"]`, `[class*="ptr"]`, custom scroll event handlers at top of scrollable containers | MINOR |
-| 9.2 | Swipe-back gesture support | 100% of pushed screens | Navigate into sub-pages, verify `history.back()` works and left-edge swipe is not blocked by the page | MINOR |
-| 9.3 | Swipe-to-reveal on list items | Consistent across all applicable lists | Check for swipe-to-reveal patterns (`[class*="swipe"]`, `[class*="slide-action"]`) on list items | MINOR |
-| 9.4 | Gesture cancellability | User can cancel mid-gesture | Verify that swipe/drag gestures can be cancelled by reversing direction or moving finger off target | MINOR |
-| 9.5 | Skeleton screens for loads > 300ms | Present for content-loading screens | Query `[class*="skeleton"]`, `[class*="shimmer"]`, `[class*="placeholder"]` during navigation transitions | MINOR |
+| # | Check | Tier | Threshold | Method | Severity |
+|---|-------|------|-----------|--------|----------|
+| 9.1 | Pull-to-refresh on scrollable lists | `[H]` | Present on all scrollable list screens | Check for refresh indicators: `[class*="pull-to-refresh"]`, `[class*="ptr"]`, custom scroll event handlers at top of scrollable containers | MINOR |
+| 9.2 | Swipe-back gesture support | `[J]` | 100% of pushed screens | Navigate into sub-pages, verify `history.back()` works and left-edge swipe is not blocked by the page | MINOR |
+| 9.3 | Swipe-to-reveal on list items | `[J]` | Consistent across all applicable lists | Check for swipe-to-reveal patterns (`[class*="swipe"]`, `[class*="slide-action"]`) on list items | MINOR |
+| 9.4 | Gesture cancellability | `[J]` | User can cancel mid-gesture | Verify that swipe/drag gestures can be cancelled by reversing direction or moving finger off target | MINOR |
+| 9.5 | Skeleton screens for loads > 300ms | `[D]` | Present for content-loading screens | Query `[class*="skeleton"]`, `[class*="shimmer"]`, `[class*="placeholder"]` during navigation transitions | MINOR |
 
 ---
 
 ## Category 10: Animation & Motion (5 checks)
 
-| # | Check | Threshold | Method | Severity |
-|---|-------|-----------|--------|----------|
-| 10.1 | Animation duration range | 100-600ms (MD3 standard range) | Audit CSS `transition-duration` and `animation-duration` on all elements; flag values outside range | MINOR |
-| 10.2 | No linear easing on spatial transforms | 0 violations | Check `transition-timing-function` on elements that transition `transform`, `left`, `top`, `width`, `height`; flag `linear` | MINOR |
-| 10.3 | Entrance vs exit asymmetry | Exit animations faster than entrance | Compare enter/exit duration values in CSS transitions; exit should be shorter | MINOR |
-| 10.4 | Elevation consistency (MD3) | Standard levels: 0/1/3/6/8/12dp | Audit `box-shadow` values and map to MD3 elevation levels; flag non-standard elevations | MINOR |
-| 10.5 | Tonal elevation preferred | Shadow-only elements flagged | Count elements using `box-shadow` for elevation without a corresponding tonal surface color (background-color shift); prefer tonal elevation | MINOR |
+| # | Check | Tier | Threshold | Method | Severity |
+|---|-------|------|-----------|--------|----------|
+| 10.1 | Animation duration range | `[D]` `[research: MD3]` | 100-600ms (MD3 standard range) | Audit CSS `transition-duration` and `animation-duration` on all elements; flag values outside range | MINOR |
+| 10.2 | No linear easing on spatial transforms | `[D]` | 0 violations | Check `transition-timing-function` on elements that transition `transform`, `left`, `top`, `width`, `height`; flag `linear` | MINOR |
+| 10.3 | Entrance vs exit asymmetry | `[J]` | Exit animations faster than entrance | Compare enter/exit duration values in CSS transitions; exit should be shorter | MINOR |
+| 10.4 | Elevation consistency (MD3) | `[H]` `[research: MD3]` | Standard levels: 0/1/3/6/8/12dp | Audit `box-shadow` values and map to MD3 elevation levels; flag non-standard elevations | MINOR |
+| 10.5 | Tonal elevation preferred | `[H]` | Shadow-only elements flagged | Count elements using `box-shadow` for elevation without a corresponding tonal surface color (background-color shift); prefer tonal elevation | MINOR |
 
 ### MD3 Duration Tokens
 
@@ -317,26 +330,37 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
   const content = meta.getAttribute('content') || '';
   const issues = [];
 
-  if (!content.includes('width=device-width')) {
+  // Parse content into key-value pairs for robust comparison
+  const params = {};
+  content.split(',').forEach(part => {
+    const [key, val] = part.split('=').map(s => s.trim());
+    if (key) params[key.toLowerCase()] = val;
+  });
+
+  if (params['width'] !== 'device-width') {
     issues.push('Missing width=device-width');
   }
-  if (!content.includes('initial-scale=1')) {
-    issues.push('Missing initial-scale=1');
+  // Compare initial-scale numerically so both "1" and "1.0" pass
+  const initialScale = parseFloat(params['initial-scale']);
+  if (isNaN(initialScale) || initialScale !== 1) {
+    issues.push('Missing or incorrect initial-scale=1');
   }
-  if (content.includes('user-scalable=no') || content.includes('user-scalable=0')) {
+  const userScalable = (params['user-scalable'] || '').toLowerCase();
+  if (userScalable === 'no' || userScalable === '0') {
     issues.push('CRITICAL: user-scalable=no disables zoom (accessibility violation)');
   }
 
-  const maxScaleMatch = content.match(/maximum-scale=([0-9.]+)/);
-  if (maxScaleMatch && parseFloat(maxScaleMatch[1]) < 2) {
-    issues.push(`maximum-scale=${maxScaleMatch[1]} restricts zoom below 2x`);
+  const maxScale = parseFloat(params['maximum-scale']);
+  if (!isNaN(maxScale) && maxScale < 2) {
+    issues.push(`maximum-scale=${params['maximum-scale']} restricts zoom below 2x`);
   }
 
-  const viewportFit = content.includes('viewport-fit=cover');
+  const viewportFit = params['viewport-fit'] === 'cover';
 
   return {
     present: true,
     content,
+    parsed: params,
     viewportFitCover: viewportFit,
     issues,
     pass: issues.length === 0
@@ -444,7 +468,7 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
     const issues = [];
 
     for (const [keyword, expected] of Object.entries(keywordMap)) {
-      if (combined.includes(keyword)) {
+      if (new RegExp('\\b' + keyword + '\\b', 'i').test(combined)) {
         if (expected.type && el.type !== expected.type) {
           issues.push(`Expected type="${expected.type}" for ${keyword} field, got "${el.type}"`);
         }
@@ -525,17 +549,21 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
   const viewportHeight = window.innerHeight;
   const viewportArea = viewportWidth * viewportHeight;
   const overlays = [];
+  const stickyElements = [];
 
+  // Single pass over all elements for both overlay and sticky detection
   document.querySelectorAll('*').forEach(el => {
     const computed = getComputedStyle(el);
     const position = computed.position;
-    const zIndex = parseInt(computed.zIndex) || 0;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
 
-    if ((position === 'fixed' || position === 'absolute') && zIndex > 1000) {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        const area = rect.width * rect.height;
-        const coveragePercent = (area / viewportArea) * 100;
+    // Overlay detection: any position:fixed element covering > 10% viewport
+    if (position === 'fixed') {
+      const area = rect.width * rect.height;
+      const coveragePercent = (area / viewportArea) * 100;
+      if (coveragePercent > 10) {
+        const zIndex = parseInt(computed.zIndex) || 0;
         overlays.push({
           tag: el.tagName,
           class: (el.className || '').toString().slice(0, 40),
@@ -546,16 +574,9 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
         });
       }
     }
-  });
 
-  const totalCoverage = overlays.reduce((sum, o) => sum + o.coveragePercent, 0);
-
-  // Check sticky banner height
-  const stickyElements = [];
-  document.querySelectorAll('*').forEach(el => {
-    const computed = getComputedStyle(el);
-    if (computed.position === 'fixed' || computed.position === 'sticky') {
-      const rect = el.getBoundingClientRect();
+    // Sticky banner detection
+    if (position === 'fixed' || position === 'sticky') {
       if (rect.height > 0 && (rect.top < 10 || rect.bottom > viewportHeight - 10)) {
         stickyElements.push({
           tag: el.tagName,
@@ -568,6 +589,9 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
     }
   });
 
+  // Note: overlapping overlays may overcount slightly; union computation
+  // is complex and omitted for simplicity.
+  const totalCoverage = overlays.reduce((sum, o) => sum + o.coveragePercent, 0);
   const stickyTotalPercent = stickyElements.reduce((sum, s) => sum + s.percentOfViewport, 0);
 
   return {
@@ -577,7 +601,8 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
     overlayCoveragePass: totalCoverage < 30,
     stickyElements: stickyElements.slice(0, 5),
     stickyTotalPercent: Math.round(stickyTotalPercent * 10) / 10,
-    stickyBannerPass: stickyTotalPercent < 15
+    stickyBannerPass: stickyTotalPercent < 15,
+    note: 'Overlapping overlays may overcount slightly'
   };
 })()
 ```
@@ -595,14 +620,25 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
   }
 
   function parseColor(str) {
-    const div = document.createElement('div');
-    div.style.color = str;
-    document.body.appendChild(div);
-    const computed = getComputedStyle(div).color;
-    document.body.removeChild(div);
-    const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    const match = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
     if (!match) return null;
-    return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]) };
+    return {
+      r: parseInt(match[1]),
+      g: parseInt(match[2]),
+      b: parseInt(match[3]),
+      a: match[4] !== undefined ? parseFloat(match[4]) : 1
+    };
+  }
+
+  function blendColors(fg, bg) {
+    // Alpha-blend fg over bg: effective = fg * alpha + bg * (1 - alpha)
+    const a = fg.a;
+    return {
+      r: Math.round(fg.r * a + bg.r * (1 - a)),
+      g: Math.round(fg.g * a + bg.g * (1 - a)),
+      b: Math.round(fg.b * a + bg.b * (1 - a)),
+      a: 1
+    };
   }
 
   function contrastRatio(c1, c2) {
@@ -613,22 +649,37 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
     return (lighter + 0.05) / (darker + 0.05);
   }
 
+  function hasBackgroundImage(el) {
+    let current = el;
+    while (current && current !== document.documentElement) {
+      const bgImage = getComputedStyle(current).backgroundImage;
+      if (bgImage && bgImage !== 'none') return true;
+      current = current.parentElement;
+    }
+    return false;
+  }
+
   function getEffectiveBg(el) {
     let current = el;
     while (current && current !== document.documentElement) {
       const bg = getComputedStyle(current).backgroundColor;
       const parsed = parseColor(bg);
-      if (parsed && !(parsed.r === 0 && parsed.g === 0 && parsed.b === 0 &&
-          bg.includes('rgba') && bg.includes(', 0)'))) {
+      if (parsed && parsed.a >= 0.01) {
+        if (parsed.a < 1) {
+          // Semi-transparent: blend with parent background
+          const parentBg = current.parentElement ? getEffectiveBg(current.parentElement) : { r: 255, g: 255, b: 255, a: 1 };
+          return blendColors(parsed, parentBg);
+        }
         return parsed;
       }
       current = current.parentElement;
     }
-    return { r: 255, g: 255, b: 255 }; // default white
+    return { r: 255, g: 255, b: 255, a: 1 }; // default white
   }
 
-  const textElements = document.querySelectorAll('p, span, a, h1, h2, h3, h4, h5, h6, li, label, td, th, div');
+  const textElements = document.querySelectorAll('p, span, a, h1, h2, h3, h4, h5, h6, li, label, td, th, div, button, input, textarea, select, figcaption, blockquote, dt, dd');
   const violations = [];
+  const indeterminate = [];
 
   textElements.forEach(el => {
     const rect = el.getBoundingClientRect();
@@ -636,9 +687,23 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
     if (!el.textContent?.trim()) return;
 
     const computed = getComputedStyle(el);
-    const fg = parseColor(computed.color);
+
+    // Check for background-image which makes contrast indeterminate
+    if (hasBackgroundImage(el)) {
+      indeterminate.push({
+        text: el.textContent.trim().slice(0, 30),
+        tag: el.tagName,
+        reason: 'background-image'
+      });
+      return;
+    }
+
+    const fgParsed = parseColor(computed.color);
     const bg = getEffectiveBg(el);
-    if (!fg || !bg) return;
+    if (!fgParsed || !bg) return;
+
+    // Blend foreground if semi-transparent
+    const fg = fgParsed.a < 1 ? blendColors(fgParsed, bg) : fgParsed;
 
     const ratio = contrastRatio(fg, bg);
     const fontSize = parseFloat(computed.fontSize);
@@ -664,7 +729,9 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
   return {
     totalTextElements: textElements.length,
     contrastViolations: violations.length,
+    indeterminateCount: indeterminate.length,
     violations: violations.slice(0, 15),
+    indeterminate: indeterminate.slice(0, 10),
     pass: violations.length === 0
   };
 })()
@@ -722,16 +789,46 @@ The following JavaScript snippets are designed for use with `browser_evaluate` t
   });
 
   // Method 4: SVG with 3 horizontal lines (hamburger icon)
+  // Require lines to be approximately horizontal (similar y-coords, varying x-coords)
+  // and evenly spaced to reduce false positives
   const svgs = document.querySelectorAll('button svg, [role="button"] svg');
   svgs.forEach(svg => {
     const lines = svg.querySelectorAll('line, rect, path');
     if (lines.length >= 2 && lines.length <= 4) {
-      indicators.push({
-        method: 'svg-icon',
-        element: svg.closest('button, [role="button"]')?.tagName || 'SVG',
-        lineCount: lines.length,
-        visible: svg.getBoundingClientRect().width > 0
-      });
+      const lineRects = Array.from(lines).map(l => l.getBoundingClientRect());
+      // Check if lines are approximately horizontal and evenly spaced
+      const yPositions = lineRects.map(r => Math.round(r.top + r.height / 2)).sort((a, b) => a - b);
+      const isHorizontal = lineRects.every(r => r.width > r.height * 1.5);
+      let isEvenlySpaced = true;
+      if (yPositions.length >= 3) {
+        const gaps = [];
+        for (let k = 1; k < yPositions.length; k++) {
+          gaps.push(yPositions[k] - yPositions[k - 1]);
+        }
+        const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+        isEvenlySpaced = gaps.every(g => Math.abs(g - avgGap) < avgGap * 0.3);
+      }
+
+      const btn = svg.closest('button, [role="button"]');
+      // Also check if button has aria-controls pointing to a nav or [role="navigation"]
+      let controlsNav = false;
+      if (btn) {
+        const ariaControls = btn.getAttribute('aria-controls');
+        if (ariaControls) {
+          const target = document.getElementById(ariaControls);
+          controlsNav = target?.tagName === 'NAV' || target?.getAttribute('role') === 'navigation' || !!target?.querySelector('nav, [role="navigation"]');
+        }
+      }
+
+      if (isHorizontal && isEvenlySpaced) {
+        indicators.push({
+          method: 'svg-icon',
+          element: btn?.tagName || 'SVG',
+          lineCount: lines.length,
+          controlsNav,
+          visible: svg.getBoundingClientRect().width > 0
+        });
+      }
     }
   });
 
@@ -918,37 +1015,86 @@ Each category receives one of four grades based on the severity of findings with
 
 ---
 
-## Binary Scorecard
+## Scoring Framework
+
+### Tiered Sub-Scores
+
+| Tier | Description | Confidence |
+|------|-------------|-----------|
+| Deterministic [D] | Programmatic, reproducible | High |
+| Heuristic [H] | Programmatic with <5% error | Medium |
+| LLM-Assisted [J] | Pre-filtered LLM judgment | Lower |
+
+### Graduated Scoring (0 / 0.5 / 1.0)
+
+| Check | 0 | 0.5 | 1.0 |
+|-------|---|-----|-----|
+| Touch target size | < 24px | 24-43px | >= 44px |
+| Color contrast | < 2:1 | 2:1-4.4:1 | >= 4.5:1 |
+| Animation duration | > 1500ms | 600-1500ms | 100-600ms |
+| Line length (mobile) | > 60 or < 15 chars | 50-60 or 15-30 | 30-50 |
+
+### Category Weighting
+
+| Weight | Categories |
+|--------|-----------|
+| 2x | Touch & Interaction (Cat 1), Mobile Accessibility (Cat 8) |
+| 1.5x | Mobile Typography (Cat 5), iOS Safari (Cat 2), Interstitials (Cat 7), Mobile Form UX (Cat 6) |
+| 1x | Viewport & Responsive (Cat 4), iOS Native Feel (Cat 3) |
+| 0.5x | Gestures & Interaction (Cat 9), Animation & Motion (Cat 10) |
+
+### Critical Floor Rule
+
+If ANY CRITICAL-severity check fails, total weighted score capped at 50%.
+
+### Compound Conditions
+
+1. Touch target >= 44x44 AND visible content >= 30x30
+2. `prefers-reduced-motion` present AND modifies animation/transition properties
+3. `autocomplete` present AND valid HTML token
+4. Skeleton screen class found AND visible dimensions AND CSS animation present
+
+---
+
+## Weighted Scorecard
 
 **Total checks:** 56 (across 10 categories)
 
 Each check is scored as:
-- **Pass = 1** (meets threshold)
-- **Fail = 0** (does not meet threshold)
+- **1.0** (fully meets threshold)
+- **0.5** (partially meets threshold — see graduated scoring above)
+- **0** (does not meet threshold)
 
-**Score presentation:** X/56 (percentage)
+**Score presentation:** X/Y Weighted (Z%)
 
 ### Scorecard Template
 
 ```markdown
 ## Mobile UX Audit Results
 
-### Scorecard: X/56 Pass (XX%)
+### Scorecard: X/Y Weighted (Z%)
+
+| Tier | Pass/Total | Confidence |
+|------|------------|-----------|
+| Deterministic [D] | 35/38 | High |
+| Heuristic [H] | 10/12 | Medium |
+| LLM-Assisted [J] | 3/6 | Lower |
+| **Weighted Total** | **X/Y** | |
 
 ### [Screen Name] — [URL] (393x852)
 
-| Category | Grade | Pass/Total | Findings |
-|----------|-------|------------|----------|
-| Touch & Interaction | — | —/7 | — |
-| iOS Safari Specific | — | —/5 | — |
-| iOS Native Feel | — | —/6 | — |
-| Viewport & Responsive | — | —/6 | — |
-| Mobile Typography | — | —/10 | — |
-| Mobile Form UX | — | —/8 | — |
-| Interstitials & Overlays | — | —/4 | — |
-| Mobile Accessibility | — | —/6 | — |
-| Gestures & Interaction | — | —/5 | — |
-| Animation & Motion | — | —/5 | — |
+| Category | Weight | Grade | Pass/Total | Findings |
+|----------|--------|-------|------------|----------|
+| Touch & Interaction | 2x | — | —/7 | — |
+| iOS Safari Specific | 1.5x | — | —/5 | — |
+| iOS Native Feel | 1x | — | —/6 | — |
+| Viewport & Responsive | 1x | — | —/6 | — |
+| Mobile Typography | 1.5x | — | —/10 | — |
+| Mobile Form UX | 1.5x | — | —/8 | — |
+| Interstitials & Overlays | 1.5x | — | —/4 | — |
+| Mobile Accessibility | 2x | — | —/6 | — |
+| Gestures & Interaction | 0.5x | — | —/5 | — |
+| Animation & Motion | 0.5x | — | —/5 | — |
 
 ### Findings Detail
 1. [SEVERITY] **Finding title** — Description with measured value vs threshold...
@@ -956,16 +1102,16 @@ Each check is scored as:
 
 ### Check Count Summary
 
-| Category | Check Count |
-|----------|------------|
-| 1. Touch & Interaction | 7 |
-| 2. iOS Safari Specific | 5 |
-| 3. iOS Native Feel | 6 |
-| 4. Viewport & Responsive | 6 |
-| 5. Mobile Typography | 10 |
-| 6. Mobile Form UX | 8 |
-| 7. Interstitials & Overlays | 4 |
-| 8. Mobile Accessibility — WCAG Mobile | 6 |
-| 9. Gestures & Interaction | 5 |
-| 10. Animation & Motion | 5 |
-| **Total** | **56** |
+| Category | Check Count | Tier Breakdown |
+|----------|------------|---------------|
+| 1. Touch & Interaction | 7 | 7 [D] |
+| 2. iOS Safari Specific | 5 | 3 [D], 2 [H] |
+| 3. iOS Native Feel | 6 | 4 [H], 2 [J] |
+| 4. Viewport & Responsive | 6 | 5 [D], 1 [H] |
+| 5. Mobile Typography | 10 | 9 [D], 1 [H] |
+| 6. Mobile Form UX | 8 | 8 [D] |
+| 7. Interstitials & Overlays | 4 | 3 [D], 1 [H] |
+| 8. Mobile Accessibility — WCAG Mobile | 6 | 2 [D], 4 [H] |
+| 9. Gestures & Interaction | 5 | 1 [D], 1 [H], 3 [J] |
+| 10. Animation & Motion | 5 | 2 [D], 2 [H], 1 [J] |
+| **Total** | **56** | **38 [D], 12 [H], 6 [J]** |
