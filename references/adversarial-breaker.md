@@ -113,6 +113,112 @@ async (page) => {
 - Hidden form fields: look for hidden inputs containing sensitive data
 - CSP headers: check if Content-Security-Policy is set
 
+### 7. Security Headers
+
+Check HTTP response headers for security best practices. Run this via `browser_evaluate`:
+
+```javascript
+(() => {
+  return fetch(window.location.href, { method: 'HEAD' })
+    .then(r => {
+      const headers = {};
+      r.headers.forEach((v, k) => headers[k] = v);
+      
+      const checks = {
+        csp: {
+          header: 'Content-Security-Policy',
+          present: !!headers['content-security-policy'],
+          value: (headers['content-security-policy'] || '').slice(0, 200),
+          severity: 'HIGH',
+          impact: 'Missing CSP allows XSS and data injection attacks'
+        },
+        hsts: {
+          header: 'Strict-Transport-Security',
+          present: !!headers['strict-transport-security'],
+          value: headers['strict-transport-security'] || '',
+          hasMaxAge: (headers['strict-transport-security'] || '').includes('max-age'),
+          severity: 'HIGH',
+          impact: 'Missing HSTS allows protocol downgrade attacks'
+        },
+        xFrameOptions: {
+          header: 'X-Frame-Options',
+          present: !!headers['x-frame-options'],
+          value: headers['x-frame-options'] || '',
+          severity: 'MEDIUM',
+          impact: 'Missing X-Frame-Options allows clickjacking'
+        },
+        xContentType: {
+          header: 'X-Content-Type-Options',
+          present: !!headers['x-content-type-options'],
+          isNosniff: headers['x-content-type-options'] === 'nosniff',
+          severity: 'MEDIUM',
+          impact: 'Missing nosniff allows MIME type confusion attacks'
+        },
+        referrerPolicy: {
+          header: 'Referrer-Policy',
+          present: !!headers['referrer-policy'],
+          value: headers['referrer-policy'] || '',
+          severity: 'LOW',
+          impact: 'Missing referrer policy may leak sensitive URL information'
+        },
+        permissionsPolicy: {
+          header: 'Permissions-Policy',
+          present: !!headers['permissions-policy'],
+          value: (headers['permissions-policy'] || '').slice(0, 200),
+          severity: 'MEDIUM',
+          impact: 'Missing permissions policy allows unrestricted access to camera, mic, geolocation'
+        }
+      };
+      
+      // Check Subresource Integrity on third-party scripts
+      const scripts = document.querySelectorAll('script[src]');
+      const thirdParty = [...scripts].filter(s => {
+        try { return new URL(s.src).origin !== window.location.origin; }
+        catch { return false; }
+      });
+      const withIntegrity = thirdParty.filter(s => s.hasAttribute('integrity'));
+      
+      checks.sri = {
+        header: 'Subresource Integrity',
+        thirdPartyScripts: thirdParty.length,
+        withIntegrity: withIntegrity.length,
+        missingIntegrity: thirdParty.length - withIntegrity.length,
+        severity: thirdParty.length > 0 && withIntegrity.length === 0 ? 'MEDIUM' : 'LOW',
+        impact: 'Third-party scripts without integrity hashes can be tampered with'
+      };
+      
+      // Check cookie security flags (visible cookies only — HttpOnly not visible to JS)
+      const cookies = document.cookie.split(';').map(c => c.trim()).filter(c => c.length > 0);
+      checks.cookies = {
+        header: 'Cookie Security',
+        visibleCookies: cookies.length,
+        note: 'HttpOnly cookies are not visible to JavaScript (which is correct). Only non-HttpOnly cookies are listed here.',
+        severity: cookies.length > 5 ? 'MEDIUM' : 'LOW',
+        impact: 'Excessive non-HttpOnly cookies may expose session data to XSS'
+      };
+      
+      const missing = Object.entries(checks)
+        .filter(([k, v]) => v.present === false && v.severity)
+        .map(([k, v]) => ({ header: v.header || k, severity: v.severity, impact: v.impact }));
+      
+      return {
+        check: 'security_headers',
+        headers: checks,
+        missingCount: missing.length,
+        missing,
+        highSeverity: missing.filter(m => m.severity === 'HIGH').length,
+        mediumSeverity: missing.filter(m => m.severity === 'MEDIUM').length
+      };
+    })
+    .catch(e => ({ check: 'security_headers', available: false, reason: e.message }));
+})()
+```
+
+**Severity ratings:**
+- **HIGH**: Missing CSP, missing HSTS on HTTPS sites
+- **MEDIUM**: Missing X-Frame-Options, X-Content-Type-Options, Permissions-Policy, SRI on third-party scripts
+- **LOW**: Missing Referrer-Policy, minimal non-HttpOnly cookies
+
 ## Severity Ratings
 
 | Severity | Definition | Examples |
