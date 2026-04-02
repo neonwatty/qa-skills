@@ -1,10 +1,300 @@
-# Performance Audit — Per-Category Checklists
+# Performance Profiler — Complete Reference
 
-Detailed check tables for each performance category. Referenced by the performance-audit skill during Phase 2.
+Self-contained reference for running a full performance audit. Includes rating thresholds, runtime measurement scripts, viewport profiling, per-route profiling loop, and all static analysis checks.
 
-Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Contentful Paint), **CLS** (Cumulative Layout Shift), **INP** (Interaction to Next Paint), **TTFB** (Time to First Byte).
+## Rating Thresholds
 
-## 1. Bundle & Code Splitting
+| Metric | Good | Warning | Poor |
+|--------|------|---------|------|
+| LCP | <= 2500ms | <= 4000ms | > 4000ms |
+| CLS | <= 0.1 | <= 0.25 | > 0.25 |
+| INP | <= 200ms | <= 500ms | > 500ms |
+| FCP | <= 1800ms | <= 3000ms | > 3000ms |
+| TTFB | <= 800ms | <= 1800ms | > 1800ms |
+| TBT | <= 200ms | <= 300ms | > 300ms |
+| Total JS (compressed) | <= 300KB | <= 500KB | > 500KB |
+| Total page weight | <= 2000KB | <= 4000KB | > 4000KB |
+| DOM nodes | <= 1500 | <= 3000 | > 3000 |
+| Long Tasks count | <= 3 | <= 6 | > 6 or any single > 200ms |
+| HTTP requests | <= 50 | <= 75 | > 75 |
+| JS Execution Time | <= 2s | <= 3.5s | > 3.5s |
+| Lighthouse Performance score | >= 90 | >= 50 | < 50 |
+
+## Runtime Measurement Scripts
+
+Measurement patterns for capturing performance metrics in authenticated browser sessions using `browser_evaluate`. These must be run AFTER `browser_navigate` but BEFORE any user interaction, then read AFTER a settle period.
+
+### Step 1: Navigate and Wait for Load
+
+```
+browser_navigate url="<route-url>"
+browser_wait_for text="<expected-content>" timeout=10000
+```
+
+Wait for the page to be interactive before reading metrics.
+
+### Step 2: Collect Navigation Timing (TTFB, DOM Load, Full Load)
+
+```javascript
+browser_evaluate function:
+() => {
+  const nav = performance.getEntriesByType('navigation')[0];
+  if (!nav) return { available: false };
+  return {
+    available: true,
+    ttfb_ms: Math.round(nav.responseStart - nav.requestStart),
+    dom_content_loaded_ms: Math.round(nav.domContentLoadedEventEnd - nav.startTime),
+    load_complete_ms: Math.round(nav.loadEventEnd - nav.startTime),
+    transfer_size_kb: Math.round(nav.transferSize / 1024 * 100) / 100,
+    dom_interactive_ms: Math.round(nav.domInteractive - nav.startTime),
+  };
+}
+```
+
+### Step 3: Collect LCP (Largest Contentful Paint)
+
+```javascript
+browser_evaluate function:
+() => {
+  return new Promise(resolve => {
+    const entries = performance.getEntriesByType('largest-contentful-paint');
+    if (entries.length > 0) {
+      const last = entries[entries.length - 1];
+      resolve({
+        available: true,
+        lcp_ms: Math.round(last.startTime),
+        element: last.element?.tagName?.toLowerCase() || 'unknown',
+        url: last.url || null,
+        size: last.size,
+      });
+      return;
+    }
+    // Fallback: observe for up to 3 seconds
+    let lastEntry = null;
+    const observer = new PerformanceObserver(list => {
+      const e = list.getEntries();
+      if (e.length > 0) lastEntry = e[e.length - 1];
+    });
+    observer.observe({ type: 'largest-contentful-paint', buffered: true });
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(lastEntry ? {
+        available: true,
+        lcp_ms: Math.round(lastEntry.startTime),
+        element: lastEntry.element?.tagName?.toLowerCase() || 'unknown',
+        url: lastEntry.url || null,
+        size: lastEntry.size,
+      } : { available: false });
+    }, 3000);
+  });
+}
+```
+
+### Step 4: Collect CLS (Cumulative Layout Shift)
+
+```javascript
+browser_evaluate function:
+() => {
+  return new Promise(resolve => {
+    let clsValue = 0;
+    let clsEntries = [];
+    const entries = performance.getEntriesByType('layout-shift');
+    if (entries.length > 0) {
+      for (const entry of entries) {
+        if (!entry.hadRecentInput) {
+          clsValue += entry.value;
+          clsEntries.push({
+            value: Math.round(entry.value * 10000) / 10000,
+            startTime: Math.round(entry.startTime),
+          });
+        }
+      }
+      resolve({
+        available: true,
+        cls: Math.round(clsValue * 10000) / 10000,
+        shift_count: clsEntries.length,
+        shifts: clsEntries.slice(0, 5),
+      });
+      return;
+    }
+    // Fallback: observe for up to 3 seconds
+    const observer = new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        if (!entry.hadRecentInput) {
+          clsValue += entry.value;
+          clsEntries.push({
+            value: Math.round(entry.value * 10000) / 10000,
+            startTime: Math.round(entry.startTime),
+          });
+        }
+      }
+    });
+    observer.observe({ type: 'layout-shift', buffered: true });
+    setTimeout(() => {
+      observer.disconnect();
+      resolve({
+        available: true,
+        cls: Math.round(clsValue * 10000) / 10000,
+        shift_count: clsEntries.length,
+        shifts: clsEntries.slice(0, 5),
+      });
+    }, 3000);
+  });
+}
+```
+
+### Step 5: Collect Resource Loading (Heavy Resources)
+
+```javascript
+browser_evaluate function:
+() => {
+  const resources = performance.getEntriesByType('resource');
+  const heavy = resources
+    .filter(r => r.transferSize > 50 * 1024) // > 50KB
+    .map(r => ({
+      name: r.name.split('/').pop().split('?')[0],
+      type: r.initiatorType,
+      size_kb: Math.round(r.transferSize / 1024 * 100) / 100,
+      duration_ms: Math.round(r.duration),
+    }))
+    .sort((a, b) => b.size_kb - a.size_kb)
+    .slice(0, 15);
+
+  const total_kb = Math.round(resources.reduce((sum, r) => sum + r.transferSize, 0) / 1024);
+  const js_kb = Math.round(resources.filter(r => r.initiatorType === 'script').reduce((sum, r) => sum + r.transferSize, 0) / 1024);
+  const css_kb = Math.round(resources.filter(r => r.initiatorType === 'link' || r.initiatorType === 'css').reduce((sum, r) => sum + r.transferSize, 0) / 1024);
+  const img_kb = Math.round(resources.filter(r => r.initiatorType === 'img').reduce((sum, r) => sum + r.transferSize, 0) / 1024);
+
+  return {
+    total_resources: resources.length,
+    total_kb,
+    js_kb,
+    css_kb,
+    img_kb,
+    heavy_resources: heavy,
+  };
+}
+```
+
+### Step 6: Collect FCP (First Contentful Paint)
+
+```javascript
+browser_evaluate function:
+() => {
+  const entries = performance.getEntriesByType('paint');
+  const fcp = entries.find(e => e.name === 'first-contentful-paint');
+  return fcp ? { available: true, fcp_ms: Math.round(fcp.startTime) } : { available: false };
+}
+```
+
+### Step 7: Collect Long Tasks / TBT (Total Blocking Time)
+
+```javascript
+browser_evaluate function:
+() => {
+  return new Promise(resolve => {
+    const tasks = [];
+    const observer = new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        tasks.push({ duration_ms: Math.round(entry.duration), startTime: Math.round(entry.startTime) });
+      }
+    });
+    observer.observe({ type: 'longtask', buffered: true });
+    setTimeout(() => {
+      observer.disconnect();
+      const tbt = tasks.reduce((sum, t) => sum + Math.max(0, t.duration_ms - 50), 0);
+      resolve({
+        count: tasks.length,
+        tbt_ms: tbt,
+        longest_ms: tasks.length > 0 ? Math.max(...tasks.map(t => t.duration_ms)) : 0,
+        tasks: tasks.slice(0, 10)
+      });
+    }, 5000);
+  });
+}
+```
+
+### Step 8: Collect DOM Health
+
+```javascript
+browser_evaluate function:
+() => {
+  const all = document.querySelectorAll('*');
+  let maxDepth = 0;
+  let maxChildren = 0;
+  all.forEach(el => {
+    let depth = 0;
+    let node = el;
+    while (node.parentElement) { depth++; node = node.parentElement; }
+    if (depth > maxDepth) maxDepth = depth;
+    if (el.children.length > maxChildren) maxChildren = el.children.length;
+  });
+  return { total_nodes: all.length, max_depth: maxDepth, max_children: maxChildren };
+}
+```
+
+### Step 9: Collect Memory Snapshot
+
+```javascript
+browser_evaluate function:
+() => {
+  if (performance.memory) {
+    return {
+      available: true,
+      used_mb: Math.round(performance.memory.usedJSHeapSize / 1048576 * 100) / 100,
+      total_mb: Math.round(performance.memory.totalJSHeapSize / 1048576 * 100) / 100,
+      limit_mb: Math.round(performance.memory.jsHeapSizeLimit / 1048576 * 100) / 100
+    };
+  }
+  return { available: false };
+}
+```
+
+## Viewport Profiling
+
+For comprehensive profiling, measure at both viewport sizes:
+
+**Desktop (1280x720):**
+
+```
+browser_resize width=1280 height=720
+```
+
+**Mobile (393x852):**
+
+```
+browser_resize width=393 height=852
+```
+
+Compare metrics across viewports — mobile often has different LCP elements and more layout shifts.
+
+## Per-Route Profiling Loop
+
+For each route to profile:
+
+```
+1. browser_navigate url="<route>"
+2. browser_wait_for text="<expected>" timeout=10000
+3. Wait 2 seconds for settle (layout shifts, lazy loading)
+4. Collect Navigation Timing (Step 2)
+5. Collect LCP (Step 3)
+6. Collect CLS (Step 4)
+7. Collect Resource Loading (Step 5)
+8. Collect FCP (Step 6)
+9. Collect Long Tasks / TBT (Step 7)
+10. Collect DOM Health (Step 8)
+11. Collect Memory Snapshot (Step 9)
+12. browser_take_screenshot (visual record)
+13. Record all metrics for this route
+```
+
+Repeat at each viewport size if doing multi-viewport profiling.
+
+## Static Analysis Checks
+
+Detailed check tables for each performance category. Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Contentful Paint), **CLS** (Cumulative Layout Shift), **INP** (Interaction to Next Paint), **TTFB** (Time to First Byte).
+
+### 1. Bundle & Code Splitting
 
 | #   | Check                                                   | What to look for                                                                                                                                                                                                                                                                                                                                                          | Severity | Vitals    |
 | --- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- |
@@ -19,7 +309,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | B9  | Missing `next/script` strategy for non-critical scripts | Third-party scripts loaded synchronously in `<head>` instead of using `next/script` with `strategy="lazyOnload"` or `"afterInteractive"`.                                                                                                                                                                                                                                 | HIGH     | LCP, TTFB |
 | B10 | Development-only code in production                     | `console.log`, debug panels, dev tools, mock data imports still present. Check for `process.env.NODE_ENV` guards.                                                                                                                                                                                                                                                         | LOW      | LCP       |
 
-## 2. Rendering & Hydration
+### 2. Rendering & Hydration
 
 | #   | Check                                                      | What to look for                                                                                                                                                                                                | Severity | Vitals    |
 | --- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- |
@@ -32,7 +322,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | R7  | Missing `key` prop or using index as key                   | Array rendering without stable keys causes unnecessary DOM reconciliation. Using array index as key when items can reorder or be inserted.                                                                      | LOW      | INP       |
 | R8  | Heavy state management on render path                      | Zustand/Redux selectors that return new object references on every call, causing re-renders. Check for selectors that don't use shallow comparison.                                                             | MEDIUM   | INP       |
 
-## 3. API Routes & Data Fetching
+### 3. API Routes & Data Fetching
 
 | #   | Check                                                | What to look for                                                                                                                                                             | Severity | Vitals    |
 | --- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- |
@@ -47,7 +337,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | A9  | Missing `loading.tsx` for route segments             | Route segments without `loading.tsx` show nothing during navigation. Instant loading states improve perceived performance.                                                   | LOW      | LCP       |
 | A10 | Large API response payloads                          | API routes returning >100KB JSON responses. Check for missing pagination, included binary data, or verbose nested objects.                                                   | MEDIUM   | TTFB      |
 
-## 4. Images & Assets
+### 4. Images & Assets
 
 | #   | Check                                     | What to look for                                                                                                                                                                               | Severity | Vitals   |
 | --- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------- |
@@ -60,9 +350,9 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | I7  | Large SVGs inlined in JavaScript          | SVG icons >2KB inlined as React components instead of loaded as files or using an icon sprite. Multiple large SVGs add to bundle size.                                                         | MEDIUM   | LCP      |
 | I8  | Missing favicon/icon optimization         | Multiple unoptimized favicon formats. Use `next/metadata` icon configuration for automatic optimization.                                                                                       | LOW      | TTFB     |
 
-## 5. Third-party SDKs
+### 5. Third-party SDKs
 
-### PostHog
+#### PostHog
 
 | #   | Check                                              | What to look for                                                                                                                                                               | Severity | Vitals    |
 | --- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --------- |
@@ -73,7 +363,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | PH5 | Session recording enabled globally                 | Session recording is heavy. Ensure it's gated behind a feature flag or only enabled for specific user segments/pages.                                                          | LOW      | INP       |
 | PH6 | Autocapture enabled without filtering              | Autocapture tracks every click, input change, and page view. Use `autocapture: { element_allowlist: [...] }` or `capture_pageview: false` with manual tracking.                | LOW      | INP       |
 
-### Sentry
+#### Sentry
 
 | #   | Check                                               | What to look for                                                                                                                                                                           | Severity | Vitals    |
 | --- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --------- |
@@ -84,7 +374,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | SE5 | Missing source map upload config                    | Without source maps, Sentry can't provide readable stack traces. Check for `withSentryConfig` in `next.config.ts` with `sourcemaps` configuration.                                         | LOW      | —         |
 | SE6 | Profiling enabled without sampling                  | `Sentry.browserProfilingIntegration()` without a low `profilesSampleRate` adds significant overhead to every page load.                                                                    | MEDIUM   | LCP, INP  |
 
-### Supabase
+#### Supabase
 
 | #    | Check                                          | What to look for                                                                                                                                                            | Severity | Vitals |
 | ---- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------ |
@@ -99,7 +389,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | SB9  | Missing RPC for complex queries                | Complex multi-table joins or aggregations done client-side with multiple queries instead of a single Supabase RPC (database function).                                      | MEDIUM   | TTFB   |
 | SB10 | Large file uploads without resumable upload    | Supabase Storage uploads >6MB without using `createSignedUploadUrl` or TUS resumable uploads. Large uploads block the main thread and fail on slow connections.             | LOW      | INP    |
 
-## 6. Caching & Revalidation
+### 6. Caching & Revalidation
 
 | #   | Check                                                    | What to look for                                                                                                                                                                                                            | Severity | Vitals    |
 | --- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- |
@@ -111,7 +401,7 @@ Each check is tagged with the Core Web Vital(s) it impacts: **LCP** (Largest Con
 | C6  | Revalidation interval too aggressive                     | `revalidate: 1` or very short intervals on data that doesn't change frequently. Creates unnecessary server load. Match revalidation to data change frequency.                                                               | LOW      | TTFB      |
 | C7  | Missing `stale-while-revalidate` for API routes          | API routes that could serve stale data while revalidating in the background. Use `Cache-Control: s-maxage=N, stale-while-revalidate=M`.                                                                                     | LOW      | TTFB      |
 
-## 7. Server Components & Streaming
+### 7. Server Components & Streaming
 
 | #   | Check                                                    | What to look for                                                                                                                                                              | Severity | Vitals    |
 | --- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- |
