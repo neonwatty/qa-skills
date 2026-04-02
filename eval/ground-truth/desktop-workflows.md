@@ -10,9 +10,9 @@
 | # | Workflow | Priority | Auth | Steps |
 |---|---------|----------|------|-------|
 | 1 | User Login | core | no | 5 |
-| 2 | Create Project | core | required | 9 |
+| 2 | Create Project | core | required | 8 |
 | 3 | View and Manage Tasks | core | required | 7 |
-| 4 | Edit Project (Admin) | feature | required | 7 |
+| 4 | Edit Project (Admin) | feature | required | 6 |
 | 5 | Delete Project (Admin) | feature | required | 7 |
 | 6 | User Management | feature | required | 5 |
 | 7 | Empty Project State | edge | required | 3 |
@@ -22,6 +22,8 @@
 | 11 | Invite New User (Admin) | feature | required | 6 |
 | 12 | View Notifications | feature | required | 6 |
 | 13 | Direct Task Navigation | edge | required | 4 |
+| 14 | Delete Task | feature | required | 6 |
+| 15 | Add Comment to Task | feature | required | 6 |
 
 ---
 
@@ -51,20 +53,19 @@
 
 <!-- auth: required -->
 <!-- priority: core -->
-<!-- estimated-steps: 9 -->
+<!-- estimated-steps: 8 -->
 
 **Preconditions:**
 - User is logged in as admin
 
-1. Navigate to /dashboard — the main dashboard page
-2. Click the "New Project" button — opens the create project form
-3. Verify the URL contains "/projects/new" — confirms navigation to the new project page
-4. Type "Test Project" in the "Project Name" field — fill in the project name
-5. Type "A test" in the "Description" field — fill in the project description
-6. Select "Public" from the "Visibility" dropdown — set the project visibility
-7. Click the "Create" button — submit the new project form
-8. Verify the URL contains "/projects/" — confirms redirect to the new project page
-9. Verify the heading displays "Test Project" — confirms the project was created with the correct name
+1. Navigate to /projects/new — the create project form
+2. Verify the URL contains "/projects/new" — confirms navigation to the new project page
+3. Type "Test Project" in the "Project Name" field — fill in the project name
+4. Type "A test" in the "Description" field — fill in the project description
+5. Select "Public" from the "Visibility" dropdown — set the project visibility
+6. Click the "Create" button — submit the new project form
+7. Verify the URL contains "/projects/" — confirms redirect to the new project page
+8. Verify the heading displays "Test Project" — confirms the project was created with the correct name
 
 **Postconditions:**
 - A new project named "Test Project" exists
@@ -103,19 +104,18 @@
 
 <!-- auth: required -->
 <!-- priority: feature -->
-<!-- estimated-steps: 7 -->
+<!-- estimated-steps: 6 -->
 
 **Preconditions:**
 - User is logged in as admin
 - A project named "Alpha Project" exists
 
-1. Navigate to /projects/1 — the project detail page
-2. Click the "Edit" button — opens the edit project form
-3. Verify the URL contains "/projects/1/edit" — confirms navigation to the edit page
-4. Clear the "Project Name" field — remove existing project name
-5. Type "Updated Project" in the "Project Name" field — enter the new project name
-6. Click the "Save" button — submit the updated project form
-7. Verify the heading displays "Updated Project" — confirms the project name was changed
+1. Navigate to /projects/1/edit — the project edit form
+2. Verify the URL contains "/projects/1/edit" — confirms navigation to the edit page
+3. Clear the "Project Name" field — remove existing project name
+4. Type "Updated Project" in the "Project Name" field — enter the new project name
+5. Click the "Save" button — submit the updated project form
+6. Verify the heading displays "Updated Project" — confirms the project name was changed
 
 **Postconditions:**
 - The project name has been changed to "Updated Project"
@@ -319,6 +319,52 @@
 **Postconditions:**
 - The task detail page for "Set up authentication" is displayed
 - Task status, heading, and comments are all visible
+
+---
+
+## Workflow 14: Delete Task
+
+<!-- auth: required -->
+<!-- priority: feature -->
+<!-- estimated-steps: 6 -->
+
+**Preconditions:**
+- User is logged in as admin
+- A project with at least one task exists
+
+1. Navigate to /tasks/1 — the task detail page for "Set up authentication"
+2. Verify the heading displays "Set up authentication" — confirms the correct task loaded
+3. Click the "Delete" button — initiate task deletion
+4. Verify the confirmation dialog displays "Are you sure you want to delete this task?" — confirms the dialog appeared
+5. Click the "Confirm Delete" button — confirm the deletion
+6. Verify the URL contains "/projects/" — confirms redirect back to the project page after task deletion
+
+**Postconditions:**
+- The task "Set up authentication" has been deleted
+- The user is redirected to the project page
+
+---
+
+## Workflow 15: Add Comment to Task
+
+<!-- auth: required -->
+<!-- priority: feature -->
+<!-- estimated-steps: 6 -->
+
+**Preconditions:**
+- User is logged in as admin
+- A task named "Design dashboard layout" exists
+
+1. Navigate to /tasks/2 — the task detail page for "Design dashboard layout"
+2. Verify the heading displays "Design dashboard layout" — confirms the correct task loaded
+3. Type "Looking good, almost done!" in the "Add Comment" field — enter a new comment
+4. Click the "Post Comment" button — submit the comment
+5. Verify the comments section contains "Looking good, almost done!" — confirms the comment was created and displayed
+6. Verify the comment author displays "Admin User" — confirms the comment is attributed to the correct user
+
+**Postconditions:**
+- A new comment exists on the "Design dashboard layout" task
+- The comment is visible in the comments section
 
 ---
 
