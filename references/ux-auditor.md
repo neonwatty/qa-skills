@@ -6,40 +6,56 @@ Each check maps to a binary Pass (1) or Fail (0). The total score per screen is 
 
 ---
 
+## Measurement Tier Legend
+
+Each check is tagged with its measurement confidence level:
+
+- **`[D]` Deterministic** — Fully measurable via `browser_evaluate`. Returns a numeric value with a clear threshold. Same page always produces the same result. High confidence.
+- **`[H]` Heuristic** — Measurable via `browser_evaluate` but with known false positive/negative risks (<5% error rate), OR requires Playwright interaction sequence. Reliable signal, not definitive.
+- **`[J]` LLM-Judgment** — Requires visual interpretation or semantic understanding. A programmatic pre-filter narrows what the LLM evaluates by 75-85%. Lower confidence.
+
+### Threshold Citation Legend
+
+- **`[research]`** — Backed by peer-reviewed research or official standards (WCAG, Apple HIG, MD3, Google Web Vitals)
+- **`[convention]`** — Widely accepted industry convention
+- **`[heuristic]`** — Team-chosen threshold, reasonable but not externally validated
+
+---
+
 ## Category 1: Visual Consistency
 
-- [ ] Typography: font sizes, weights, and line heights follow a consistent scale
-- [ ] Spacing: padding and margins use a consistent system (4px/8px grid or similar)
-- [ ] Colors: brand colors are used consistently, no off-by-one hex values
-- [ ] Border radii: consistent across similar elements (buttons, cards, inputs)
-- [ ] Shadows: consistent depth system, not arbitrary values
-- [ ] Icons: consistent style (outline vs filled), consistent sizing
-- [ ] Alignment: elements are properly aligned to a grid, no off-by-1px misalignment
+- [ ] `[H]` Typography: font sizes, weights, and line heights follow a consistent scale
+- [ ] `[H]` Spacing: padding and margins use a consistent system (4px/8px grid or similar)
+- [ ] `[H]` Colors: brand colors are used consistently, no off-by-one hex values
+- [ ] `[H]` Border radii: consistent across similar elements (buttons, cards, inputs)
+- [ ] `[H]` Shadows: consistent depth system, not arbitrary values
+- [ ] `[J]` Icons: consistent style (outline vs filled), consistent sizing
+- [ ] `[H]` Alignment: elements are properly aligned to a grid, no off-by-1px misalignment `[heuristic]`
 
 ---
 
 ## Category 2: Component States
 
-- [ ] Default state: clear, not ambiguous
-- [ ] Hover state: present on all interactive elements, provides visual feedback
-- [ ] Focus state: visible focus ring for keyboard navigation (accessibility)
-- [ ] Active/pressed state: provides tactile feedback
-- [ ] Disabled state: visually distinct, not clickable
-- [ ] Loading state: present where async operations occur, uses consistent pattern
-- [ ] Empty state: helpful message and action when no data exists (not just blank space)
-- [ ] Error state: clear, specific, actionable error messages near the relevant field
+- [ ] `[J]` Default state: clear, not ambiguous
+- [ ] `[H]` Hover state: present on all interactive elements, provides visual feedback
+- [ ] `[D]` Focus state: visible focus ring for keyboard navigation (accessibility)
+- [ ] `[J]` Active/pressed state: provides tactile feedback
+- [ ] `[D]` Disabled state: visually distinct, not clickable
+- [ ] `[H]` Loading state: present where async operations occur, uses consistent pattern
+- [ ] `[J]` Empty state: helpful message and action when no data exists (not just blank space)
+- [ ] `[J]` Error state: clear, specific, actionable error messages near the relevant field
 
 ---
 
 ## Category 3: Copy & Microcopy
 
-- [ ] Error messages: specific ("Email is already registered") not vague ("Something went wrong")
-- [ ] Button labels: action-oriented ("Save Changes" not "Submit"), consistent capitalization
-- [ ] Placeholder text: helpful examples, not labels (labels should be above the field)
-- [ ] Confirmation messages: tell the user what happened ("Profile updated" not "Success")
-- [ ] Empty states: explain what goes here and how to add content
-- [ ] Tooltips: present where needed, concise, not redundant with visible labels
-- [ ] Grammar and spelling: no typos, consistent voice and tense
+- [ ] `[H]` Error messages: specific ("Email is already registered") not vague ("Something went wrong")
+- [ ] `[H]` Button labels: action-oriented ("Save Changes" not "Submit"), consistent capitalization
+- [ ] `[H]` Placeholder text: helpful examples, not labels (labels should be above the field)
+- [ ] `[H]` Confirmation messages: tell the user what happened ("Profile updated" not "Success")
+- [ ] `[H]` Empty states: explain what goes here and how to add content
+- [ ] `[J]` Tooltips: present where needed, concise, not redundant with visible labels
+- [ ] `[H]` Grammar and spelling: no typos, consistent voice and tense
 
 ---
 
@@ -47,33 +63,33 @@ Each check maps to a binary Pass (1) or Fail (0). The total score per screen is 
 
 ### Existing Checks
 
-- [ ] Color contrast: text meets WCAG AA (4.5:1 for normal text, 3:1 for large)
-- [ ] Touch targets: at least 44x44px on interactive elements
-- [ ] Form labels: every input has an associated label (not just placeholder)
-- [ ] Alt text: images have meaningful alt text (or empty alt for decorative)
-- [ ] Heading hierarchy: h1 -> h2 -> h3, no skipped levels
-- [ ] Tab order: logical, follows visual flow
-- [ ] Screen reader: critical content is not conveyed by color alone
+- [ ] `[D]` Color contrast: text meets WCAG AA (4.5:1 for normal text, 3:1 for large) `[research: WCAG 2.1]`
+- [ ] `[D]` Touch targets: at least 44x44px on interactive elements `[research: WCAG 2.1]`
+- [ ] `[D]` Form labels: every input has an associated label (not just placeholder)
+- [ ] `[D]` Alt text: images have meaningful alt text (or empty alt for decorative)
+- [ ] `[D]` Heading hierarchy: h1 -> h2 -> h3, no skipped levels `[research: WCAG 2.1]`
+- [ ] `[D]` Tab order: logical, follows visual flow
+- [ ] `[H]` Screen reader: critical content is not conveyed by color alone
 
 ### Cognitive Load Checks (Enhanced)
 
-- [ ] Information density (words/viewport): 150-300 good, 300-500 warning, >500 bad. Method: `innerText` word count within viewport bounds
-- [ ] DOM element count: <1500 good, 1500-3000 warning, >3000 bad. Method: `querySelectorAll('*').length`
-- [ ] Choices per interaction context: <=5 good, 6-9 warning, >9 bad. Method: count visible actionable elements (buttons/links) in focused section
-- [ ] Flesch-Kincaid grade level: 7-8th good, 9-12th warning, >12th bad. Method: compute from `innerText`
-- [ ] Flesch Reading Ease: 60-80 good, 40-60 warning, <40 bad. Method: compute from `innerText`
-- [ ] Heading frequency: every 200-300 words good, 300-600 warning, >600 bad. Method: count words between h1-h6
+- [ ] `[D]` Information density (words/viewport): 150-300 good, 300-500 warning, >500 bad. Method: `innerText` word count within viewport bounds `[heuristic]`
+- [ ] `[D]` DOM element count: <1500 good, 1500-3000 warning, >3000 bad. Method: `querySelectorAll('*').length`
+- [ ] `[H]` Choices per interaction context: <=5 good, 6-9 warning, >9 bad. Method: count visible actionable elements (buttons/links) in focused section
+- [ ] `[D]` Flesch-Kincaid grade level: 7-8th good, 9-12th warning, >12th bad. Method: compute from `innerText`
+- [ ] `[D]` Flesch Reading Ease: 60-80 good, 40-60 warning, <40 bad. Method: compute from `innerText`
+- [ ] `[D]` Heading frequency: every 200-300 words good, 300-600 warning, >600 bad. Method: count words between h1-h6 `[heuristic]`
 
 ---
 
 ## Category 5: Layout & Responsiveness
 
-- [ ] Content width: readable line length (45-75 characters for body text)
-- [ ] Viewport fit: no horizontal scroll at the current viewport
-- [ ] Element overflow: text truncates gracefully (ellipsis, not clip)
-- [ ] Image sizing: images are properly constrained, no layout shift on load
-- [ ] Whitespace: balanced, no cramped or excessively empty areas
-- [ ] Z-index: overlapping elements stack correctly (dropdowns, modals, tooltips)
+- [ ] `[D]` Content width: readable line length (45-75 characters for body text) `[research: WCAG 2.1]`
+- [ ] `[D]` Viewport fit: no horizontal scroll at the current viewport
+- [ ] `[D]` Element overflow: text truncates gracefully (ellipsis, not clip)
+- [ ] `[H]` Image sizing: images are properly constrained, no layout shift on load
+- [ ] `[J]` Whitespace: balanced, no cramped or excessively empty areas `[heuristic]`
+- [ ] `[J]` Z-index: overlapping elements stack correctly (dropdowns, modals, tooltips)
 
 ---
 
@@ -81,20 +97,20 @@ Each check maps to a binary Pass (1) or Fail (0). The total score per screen is 
 
 ### Existing Checks
 
-- [ ] Current location: user knows where they are (breadcrumbs, active nav state, page title)
-- [ ] Back navigation: browser back button works as expected
-- [ ] URL reflects state: deep-linkable, shareable
-- [ ] Dead ends: no pages without a clear next action or way to navigate away
-- [ ] Breadcrumbs: present on nested pages, clickable
+- [ ] `[D]` Current location: user knows where they are (breadcrumbs, active nav state, page title)
+- [ ] `[H]` Back navigation: browser back button works as expected
+- [ ] `[H]` URL reflects state: deep-linkable, shareable
+- [ ] `[H]` Dead ends: no pages without a clear next action or way to navigate away
+- [ ] `[D]` Breadcrumbs: present on nested pages, clickable
 
 ### Enhanced Checks
 
-- [ ] Primary nav item count: 5-7 good, 8-9 warning, >9 bad
-- [ ] Dropdown item count per group: <=7 good, 8-15 warning, >15 bad
-- [ ] Click depth to key pages: <=3 good, 4 warning, >5 bad
-- [ ] Breadcrumbs at depth >= 3: present = good, absent = bad
-- [ ] CTA count per view: 1 primary good, 2-3 warning, >3 competing bad
-- [ ] Back button fidelity: 100% good, <80% bad
+- [ ] `[D]` Primary nav item count: 5-7 good, 8-9 warning, >9 bad `[convention]`
+- [ ] `[D]` Dropdown item count per group: <=7 good, 8-15 warning, >15 bad
+- [ ] `[H]` Click depth to key pages: <=3 good, 4 warning, >5 bad
+- [ ] `[D]` Breadcrumbs at depth >= 3: present = good, absent = bad
+- [ ] `[D]` CTA count per view: 1 primary good, 2-3 warning, >3 competing bad `[convention]`
+- [ ] `[H]` Back button fidelity: 100% good, <80% bad
 
 ---
 
@@ -102,22 +118,22 @@ Each check maps to a binary Pass (1) or Fail (0). The total score per screen is 
 
 ### Existing Checks
 
-- [ ] Validation timing: inline validation on blur, not only on submit
-- [ ] Required indicators: clear marking of required fields
-- [ ] Input types: correct HTML input types (email, tel, number, url)
-- [ ] Autofill: standard fields work with browser autofill
-- [ ] Multi-step forms: progress indicator, ability to go back
-- [ ] Destructive actions: confirmation before irreversible operations
+- [ ] `[H]` Validation timing: inline validation on blur, not only on submit
+- [ ] `[D]` Required indicators: clear marking of required fields
+- [ ] `[D]` Input types: correct HTML input types (email, tel, number, url)
+- [ ] `[D]` Autofill: standard fields work with browser autofill
+- [ ] `[D]` Multi-step forms: progress indicator, ability to go back
+- [ ] `[H]` Destructive actions: confirmation before irreversible operations
 
 ### Enhanced Checks
 
-- [ ] Visible fields per section: 3-5 good, 6-7 warning, >7 bad
-- [ ] Error message position: inline = good, top of form = warning, console/alert = bad
-- [ ] Error message actionability: names field + fix = good, generic = warning, missing = bad
-- [ ] Validation timing (granular): on-blur = good, on-submit only = warning, premature = bad
-- [ ] Multi-step progress indicator: present for >5 fields = good, absent = bad
-- [ ] Destructive action confirmation: specific verb = good, generic OK/Cancel = warning, none = bad
-- [ ] Undo availability: undo toast = good, confirmation only = warning, neither = bad
+- [ ] `[D]` Visible fields per section: 3-5 good, 6-7 warning, >7 bad
+- [ ] `[D]` Error message position: inline = good, top of form = warning, console/alert = bad
+- [ ] `[J]` Error message actionability: names field + fix = good, generic = warning, missing = bad
+- [ ] `[H]` Validation timing (granular): on-blur = good, on-submit only = warning, premature = bad
+- [ ] `[D]` Multi-step progress indicator: present for >5 fields = good, absent = bad
+- [ ] `[D]` Destructive action confirmation: specific verb = good, generic OK/Cancel = warning, none = bad
+- [ ] `[J]` Undo availability: undo toast = good, confirmation only = warning, neither = bad
 
 ---
 
@@ -125,53 +141,53 @@ Each check maps to a binary Pass (1) or Fail (0). The total score per screen is 
 
 ### Existing Checks
 
-- [ ] Action feedback: every user action gets visible confirmation
-- [ ] Loading indicators: present during async operations, appropriate type (spinner vs skeleton vs progress)
-- [ ] Optimistic updates: UI responds immediately where appropriate
-- [ ] Error recovery: clear path to retry or correct after errors
-- [ ] Success confirmation: user knows the action completed
+- [ ] `[J]` Action feedback: every user action gets visible confirmation
+- [ ] `[H]` Loading indicators: present during async operations, appropriate type (spinner vs skeleton vs progress)
+- [ ] `[J]` Optimistic updates: UI responds immediately where appropriate
+- [ ] `[H]` Error recovery: clear path to retry or correct after errors
+- [ ] `[H]` Success confirmation: user knows the action completed
 
 ### Enhanced Checks
 
-- [ ] Skeleton screen presence: skeleton for loads >300ms = good, spinner only = warning, blank = bad
-- [ ] Blank screen time: 0ms = good, any blank period = bad
-- [ ] CLS during loading: 0 = good, <0.1 = warning, >0.1 = bad
-- [ ] Animation duration: 200-300ms = good, 100-500ms = warning, >500ms = bad
-- [ ] Toast/notification duration: 3-5s = good, <2s or no auto-dismiss for errors = bad
-- [ ] Pull-to-refresh on scrollable lists: present = good, absent = bad
-- [ ] Search-as-you-type latency: <200ms good, 200-500ms warning, >500ms bad
+- [ ] `[D]` Skeleton screen presence: skeleton for loads >300ms = good, spinner only = warning, blank = bad
+- [ ] `[H]` Blank screen time: 0ms = good, any blank period = bad
+- [ ] `[D]` CLS during loading: 0 = good, <0.1 = warning, >0.1 = bad `[research: Google Web Vitals]`
+- [ ] `[D]` Animation duration: 200-300ms = good, 100-500ms = warning, >500ms = bad `[convention]`
+- [ ] `[H]` Toast/notification duration: 3-5s = good, <2s or no auto-dismiss for errors = bad
+- [ ] `[H]` Pull-to-refresh on scrollable lists: present = good, absent = bad
+- [ ] `[H]` Search-as-you-type latency: <200ms good, 200-500ms warning, >500ms bad
 
 ---
 
 ## Category 9: Data Display & Scalability (10 checks)
 
-- [ ] Page scroll depth ratio: <=3x good, 3-5x warning, >5x bad. Method: `scrollHeight / clientHeight`
-- [ ] Repeated item count without pagination: <=25 good, 25-50 warning, >50 bad
-- [ ] Pagination controls present: present when items >25 = good, absent = bad
-- [ ] Search input present: present when items >50 = good, absent = bad
-- [ ] Filter controls present: present when items >25 = good, absent = bad
-- [ ] Sticky header on long pages: present when scroll >3x = good, absent = bad
-- [ ] Empty state quality: explanation + CTA + visual = good, text only = warning, blank = bad
-- [ ] Virtual scroll for large lists: present when items >200 = good, absent = bad
-- [ ] Scroll-to-action distance: CTA within 2 viewports = good, >2 = bad
-- [ ] Items-per-page count: 10-50 good, 50-100 warning, >100 bad
+- [ ] `[D]` Page scroll depth ratio: <=3x good, 3-5x warning, >5x bad. Method: `scrollHeight / clientHeight` `[heuristic]`
+- [ ] `[D]` Repeated item count without pagination: <=25 good, 25-50 warning, >50 bad
+- [ ] `[D]` Pagination controls present: present when items >25 = good, absent = bad
+- [ ] `[D]` Search input present: present when items >50 = good, absent = bad
+- [ ] `[D]` Filter controls present: present when items >25 = good, absent = bad
+- [ ] `[D]` Sticky header on long pages: present when scroll >3x = good, absent = bad
+- [ ] `[J]` Empty state quality: explanation + CTA + visual = good, text only = warning, blank = bad
+- [ ] `[H]` Virtual scroll for large lists: present when items >200 = good, absent = bad
+- [ ] `[D]` Scroll-to-action distance: CTA within 2 viewports = good, >2 = bad
+- [ ] `[D]` Items-per-page count: 10-50 good, 50-100 warning, >100 bad
 
 ---
 
 ## Category 10: Visual Complexity & Consistency (12 checks)
 
-- [ ] Distinct font sizes: <=6 good, 7-9 warning, >10 bad
-- [ ] Distinct font families: <=2 good, 3 warning, >3 bad
-- [ ] Distinct font-size/weight combos: <=10 good, 11-15 warning, >15 bad
-- [ ] Distinct colors in use: <=15 good, 16-25 warning, >25 bad
-- [ ] Spacing grid conformance (4px): >90% good, 70-90% warning, <70% bad
-- [ ] Alignment consistency: <=5 left-edge clusters good, 6-8 warning, >8 bad
-- [ ] Visual balance (Ngo score): >0.85 good, 0.6-0.85 warning, <0.6 bad
-- [ ] Content line length: 45-75 chars good, 75-90 or 30-45 warning, >90 or <30 bad
-- [ ] Whitespace ratio: 30-50% good, 20-30% warning, <20% bad
-- [ ] Icon consistency (stroke/fill): uniform = good, mixed = bad
-- [ ] Icon sizing consistency: all same viewBox = good, multiple = bad
-- [ ] Button style variations: 1-3 good, 4-5 warning, >5 bad
+- [ ] `[D]` Distinct font sizes: <=6 good, 7-9 warning, >10 bad `[convention]`
+- [ ] `[D]` Distinct font families: <=2 good, 3 warning, >3 bad
+- [ ] `[D]` Distinct font-size/weight combos: <=10 good, 11-15 warning, >15 bad
+- [ ] `[D]` Distinct colors in use: <=15 good, 16-25 warning, >25 bad
+- [ ] `[D]` Spacing grid conformance (4px): >90% good, 70-90% warning, <70% bad
+- [ ] `[H]` Alignment consistency: <=5 left-edge clusters good, 6-8 warning, >8 bad `[heuristic]`
+- [ ] `[H]` Visual balance (Ngo score): >0.85 good, 0.6-0.85 warning, <0.6 bad
+- [ ] `[D]` Content line length: 45-75 chars good, 75-90 or 30-45 warning, >90 or <30 bad `[research: WCAG 2.1]`
+- [ ] `[H]` Whitespace ratio: 30-50% good, 20-30% warning, <20% bad `[heuristic]`
+- [ ] `[J]` Icon consistency (stroke/fill): uniform = good, mixed = bad
+- [ ] `[D]` Icon sizing consistency: all same viewBox = good, multiple = bad
+- [ ] `[H]` Button style variations: 1-3 good, 4-5 warning, >5 bad `[convention]`
 
 ---
 
@@ -193,15 +209,38 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
 ```javascript
 (() => {
-  // Heuristic: find the most common repeated class pattern among sibling elements
+  // Check ul/ol/table containers
   const lists = document.querySelectorAll('ul, ol, [role="list"], table > tbody');
   let maxCount = 0;
+  let maxSource = 'none';
   lists.forEach(list => {
     const children = list.children.length;
-    if (children > maxCount) maxCount = children;
+    if (children > maxCount) {
+      maxCount = children;
+      maxSource = list.tagName.toLowerCase();
+    }
   });
+
+  // Also find containers whose children share a common class pattern
+  // (>= 50% of children with same class list)
+  const containers = document.querySelectorAll('div, section, main, article');
+  containers.forEach(container => {
+    const children = Array.from(container.children);
+    if (children.length < 3) return;
+    const classCounts = {};
+    children.forEach(child => {
+      const key = Array.from(child.classList).sort().join(' ');
+      if (key) classCounts[key] = (classCounts[key] || 0) + 1;
+    });
+    const maxClassCount = Math.max(...Object.values(classCounts), 0);
+    if (maxClassCount >= children.length * 0.5 && maxClassCount > maxCount) {
+      maxCount = maxClassCount;
+      maxSource = 'class-pattern';
+    }
+  });
+
   const grade = maxCount <= 25 ? 'good' : maxCount <= 50 ? 'warning' : 'bad';
-  return { check: 'repeated_item_count', value: maxCount, grade };
+  return { check: 'repeated_item_count', value: maxCount, source: maxSource, grade };
 })()
 ```
 
@@ -209,19 +248,31 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
 ```javascript
 (() => {
-  const textEls = document.querySelectorAll('p, span, a, li, h1, h2, h3, h4, h5, h6, label, button, input, td, th, div');
   const sizes = new Set();
   const families = new Set();
   const combos = new Set();
 
-  textEls.forEach(el => {
-    const style = getComputedStyle(el);
-    if (el.innerText && el.innerText.trim().length > 0) {
-      sizes.add(style.fontSize);
-      families.add(style.fontFamily.split(',')[0].trim().replace(/['"]/g, ''));
-      combos.add(`${style.fontSize}|${style.fontWeight}|${style.fontFamily.split(',')[0].trim()}`);
+  // Use TreeWalker with SHOW_TEXT to find leaf text nodes
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.textContent || node.textContent.trim().length === 0) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     }
   });
+
+  while (walker.nextNode()) {
+    const textNode = walker.currentNode;
+    const el = textNode.parentElement;
+    if (!el) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) continue;
+    const style = getComputedStyle(el);
+    const rawSize = parseFloat(style.fontSize);
+    const roundedSize = Math.round(rawSize * 10) / 10 + 'px';
+    sizes.add(roundedSize);
+    families.add(style.fontFamily.split(',')[0].trim().replace(/['"]/g, ''));
+    combos.add(`${roundedSize}|${style.fontWeight}|${style.fontFamily.split(',')[0].trim()}`);
+  }
 
   const sizeGrade = sizes.size <= 6 ? 'good' : sizes.size <= 9 ? 'warning' : 'bad';
   const familyGrade = families.size <= 2 ? 'good' : families.size === 3 ? 'warning' : 'bad';
@@ -248,11 +299,13 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
   els.forEach(el => {
     const style = getComputedStyle(el);
+    if (style.display === 'none') return;
     props.forEach(prop => {
-      const val = parseFloat(style[prop]);
+      const raw = parseFloat(style[prop]);
+      const val = Math.abs(raw);
       if (val > 0) {
         total++;
-        if (val % 4 === 0) conforming++;
+        if (Math.round(val) % 4 === 0) conforming++;
       }
     });
   });
@@ -267,13 +320,16 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
 ```javascript
 (() => {
-  const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div, section, article, li, span, a, button, input, img');
+  const blockDisplays = new Set(['block', 'flex', 'grid', 'table', 'list-item', 'table-row', 'table-cell']);
+  const els = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div, section, article, li, button, input, img, nav, main, aside, footer, header, form, ul, ol');
   const lefts = [];
   const tolerance = 2; // px
 
   els.forEach(el => {
+    const style = getComputedStyle(el);
+    if (!blockDisplays.has(style.display)) return;
     const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+    if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0) {
       lefts.push(Math.round(rect.left));
     }
   });
@@ -303,6 +359,7 @@ JavaScript snippets for all automatable checks. Each returns a structured result
   // BM_h = 1 - |W_left - W_right| / max(W_left + W_right, 1)
   // BM_v = 1 - |W_top - W_bottom| / max(W_top + W_bottom, 1)
   // W = sum of (element area) weighted by distance from center axis
+  // Fix: process deepest-first, skip parents whose descendants were counted, clip to viewport
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -310,14 +367,35 @@ JavaScript snippets for all automatable checks. Each returns a structured result
   const cy = vh / 2;
 
   let wLeft = 0, wRight = 0, wTop = 0, wBottom = 0;
+  const counted = new Set();
 
-  const els = document.querySelectorAll('img, svg, button, input, h1, h2, h3, h4, h5, h6, p, a, video, canvas, [role="img"]');
+  const els = Array.from(document.querySelectorAll('img, svg, button, input, h1, h2, h3, h4, h5, h6, p, a, video, canvas, [role="img"]'));
+  // Sort deepest-first: elements with greater depth processed first
+  els.sort((a, b) => {
+    let dA = 0, dB = 0;
+    let n = a; while (n) { dA++; n = n.parentElement; }
+    n = b; while (n) { dB++; n = n.parentElement; }
+    return dB - dA;
+  });
+
   els.forEach(el => {
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
-    const area = rect.width * rect.height;
-    const elCx = rect.left + rect.width / 2;
-    const elCy = rect.top + rect.height / 2;
+    // Clip to viewport bounds
+    if (rect.bottom <= 0 || rect.top >= vh || rect.right <= 0 || rect.left >= vw) return;
+    // Skip if a descendant was already counted (parent would double-count)
+    let dominated = false;
+    counted.forEach(c => { if (el.contains(c)) dominated = true; });
+    if (dominated) return;
+    counted.add(el);
+
+    const clippedLeft = Math.max(rect.left, 0);
+    const clippedRight = Math.min(rect.right, vw);
+    const clippedTop = Math.max(rect.top, 0);
+    const clippedBottom = Math.min(rect.bottom, vh);
+    const area = (clippedRight - clippedLeft) * (clippedBottom - clippedTop);
+    const elCx = (clippedLeft + clippedRight) / 2;
+    const elCy = (clippedTop + clippedBottom) / 2;
 
     if (elCx < cx) wLeft += area;
     else wRight += area;
@@ -340,28 +418,27 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
 ```javascript
 (() => {
+  // Pixel-sampling approach using document.elementFromPoint on a 20px grid
+  // Eliminates double-counting from overlapping/nested elements
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const viewportArea = vw * vh;
-  let occupiedArea = 0;
+  const step = 20;
+  let totalSamples = 0;
+  let occupiedSamples = 0;
 
-  const els = document.querySelectorAll('img, svg, button, input, textarea, select, video, canvas, table, h1, h2, h3, h4, h5, h6, p, a, span, li, label');
-  els.forEach(el => {
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0 &&
-        rect.bottom > 0 && rect.top < vh &&
-        rect.right > 0 && rect.left < vw) {
-      const visW = Math.min(rect.right, vw) - Math.max(rect.left, 0);
-      const visH = Math.min(rect.bottom, vh) - Math.max(rect.top, 0);
-      occupiedArea += visW * visH;
+  for (let y = step / 2; y < vh; y += step) {
+    for (let x = step / 2; x < vw; x += step) {
+      totalSamples++;
+      const el = document.elementFromPoint(x, y);
+      if (el && el !== document.documentElement && el !== document.body) {
+        occupiedSamples++;
+      }
     }
-  });
+  }
 
-  // Clamp to viewport (overlapping elements may exceed 100%)
-  const ratio = Math.min(occupiedArea / viewportArea, 1);
-  const whitespace = Math.round((1 - ratio) * 100);
+  const whitespace = totalSamples > 0 ? Math.round((1 - occupiedSamples / totalSamples) * 100) : 50;
   const grade = whitespace >= 30 && whitespace <= 50 ? 'good' : whitespace >= 20 ? 'warning' : 'bad';
-  return { check: 'whitespace_ratio', whitespacePct: whitespace, grade };
+  return { check: 'whitespace_ratio', whitespacePct: whitespace, totalSamples, occupiedSamples, grade };
 })()
 ```
 
@@ -369,6 +446,12 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
 ```javascript
 (() => {
+  // Language check — FK is only valid for English
+  const lang = (document.documentElement.lang || '').toLowerCase();
+  if (lang && !lang.startsWith('en')) {
+    return { check: 'flesch_kincaid', available: false, reason: 'non-English content', detectedLang: lang };
+  }
+
   // Syllable estimation heuristic
   function countSyllables(word) {
     word = word.toLowerCase().replace(/[^a-z]/g, '');
@@ -379,7 +462,9 @@ JavaScript snippets for all automatable checks. Each returns a structured result
     return matches ? matches.length : 1;
   }
 
-  const text = document.body.innerText || '';
+  // Extract text from main content area only
+  const contentEl = document.querySelector('main, article, [role="main"]') || document.body;
+  const text = contentEl.innerText || '';
   const words = text.split(/\s+/).filter(w => w.length > 0);
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
 
@@ -405,6 +490,8 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
   return {
     check: 'flesch_kincaid',
+    available: true,
+    contentSource: contentEl.tagName.toLowerCase(),
     gradeLevel: { value: glRounded, grade: glGrade },
     readingEase: { value: reRounded, grade: reGrade },
     stats: { words: wordCount, sentences: sentenceCount, syllables: syllableCount }
@@ -417,16 +504,35 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 ```javascript
 (() => {
   const body = document.body;
-  const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  const hiddenTags = new Set(['SCRIPT', 'STYLE', 'TEMPLATE']);
   const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (hiddenTags.has(node.tagName)) return NodeFilter.FILTER_REJECT;
+        if (getComputedStyle(node).display === 'none') return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        const parent = node.parentElement;
+        if (parent && hiddenTags.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
   let wordsBetween = 0;
   const gaps = [];
+  const headingTexts = [];
 
   while (walker.nextNode()) {
     const node = walker.currentNode;
     if (node.nodeType === Node.ELEMENT_NODE && headingTags.has(node.tagName)) {
       if (wordsBetween > 0) gaps.push(wordsBetween);
       wordsBetween = 0;
+      headingTexts.push(node.textContent.trim());
     } else if (node.nodeType === Node.TEXT_NODE) {
       const words = node.textContent.trim().split(/\s+/).filter(w => w.length > 0);
       wordsBetween += words.length;
@@ -438,7 +544,11 @@ JavaScript snippets for all automatable checks. Each returns a structured result
   const avgGap = gaps.length > 0 ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 0;
   const grade = maxGap <= 300 ? 'good' : maxGap <= 600 ? 'warning' : 'bad';
 
-  return { check: 'heading_frequency', maxGap, avgGap, gapCount: gaps.length, grade };
+  // Compound condition: detect duplicate heading texts
+  const uniqueHeadings = new Set(headingTexts);
+  const allIdentical = headingTexts.length > 1 && uniqueHeadings.size === 1;
+
+  return { check: 'heading_frequency', maxGap, avgGap, gapCount: gaps.length, grade, headingCount: headingTexts.length, allIdentical };
 })()
 ```
 
@@ -447,21 +557,28 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 ```javascript
 (() => {
   const vh = window.innerHeight;
-  const els = document.querySelectorAll('p, span, a, li, h1, h2, h3, h4, h5, h6, label, td, th, button, div');
+  const vw = window.innerWidth;
   let wordCount = 0;
-  const counted = new Set();
 
-  els.forEach(el => {
-    const rect = el.getBoundingClientRect();
-    if (rect.top < vh && rect.bottom > 0 && !counted.has(el)) {
-      // Only count leaf text to avoid double counting
-      if (el.children.length === 0 || el.tagName === 'P' || el.tagName === 'LI') {
-        const text = el.innerText || '';
-        wordCount += text.split(/\s+/).filter(w => w.length > 0).length;
-        counted.add(el);
-      }
+  // Use TreeWalker with SHOW_TEXT to count words from text nodes only
+  // Eliminates double-counting from nested elements
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.textContent || node.textContent.trim().length === 0) return NodeFilter.FILTER_REJECT;
+      const el = node.parentElement;
+      if (!el) return NodeFilter.FILTER_REJECT;
+      const rect = el.getBoundingClientRect();
+      // Check parent element is within viewport bounds
+      if (rect.bottom <= 0 || rect.top >= vh || rect.right <= 0 || rect.left >= vw) return NodeFilter.FILTER_REJECT;
+      if (rect.width === 0 && rect.height === 0) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     }
   });
+
+  while (walker.nextNode()) {
+    const words = walker.currentNode.textContent.trim().split(/\s+/).filter(w => w.length > 0);
+    wordCount += words.length;
+  }
 
   const grade = wordCount >= 150 && wordCount <= 300 ? 'good' : wordCount <= 500 ? 'warning' : 'bad';
   return { check: 'information_density', wordsInViewport: wordCount, grade };
@@ -486,15 +603,43 @@ JavaScript snippets for all automatable checks. Each returns a structured result
   });
   const ddGrade = maxDropdownItems <= 7 ? 'good' : maxDropdownItems <= 15 ? 'warning' : 'bad';
 
-  // CTA count — primary-styled buttons in viewport
-  const buttons = document.querySelectorAll('button, a[role="button"], [class*="btn-primary"], [class*="cta"]');
+  // CTA count — exclude buttons inside nav, footer, header
+  const excludeContainers = new Set(['NAV', 'FOOTER', 'HEADER']);
+  function isInExcludedContainer(el) {
+    let parent = el.parentElement;
+    while (parent) {
+      if (excludeContainers.has(parent.tagName)) return true;
+      parent = parent.parentElement;
+    }
+    return false;
+  }
+
+  const buttons = document.querySelectorAll('button, a[role="button"], [class*="btn-primary"], [class*="cta"], input[type="submit"]');
   let ctaCount = 0;
   buttons.forEach(btn => {
     const rect = btn.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.bottom > 0 && rect.width > 0) {
+    if (rect.top >= window.innerHeight || rect.bottom <= 0 || rect.width === 0) return;
+
+    const cls = (btn.className || '').toLowerCase();
+    const isPrimaryClass = /primary|cta/.test(cls);
+    const isSubmit = btn.type === 'submit';
+    const inExcluded = isInExcludedContainer(btn);
+
+    if (inExcluded && !isPrimaryClass && !isSubmit) return;
+
+    if (isPrimaryClass || isSubmit) {
+      ctaCount++;
+      return;
+    }
+
+    // Heuristic: non-transparent background + padding >= 12px + not in nav/footer
+    if (!inExcluded) {
       const style = getComputedStyle(btn);
-      // Heuristic: prominent buttons have a non-transparent background
-      if (style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent') {
+      const bg = style.backgroundColor;
+      const hasBg = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+      const padL = parseFloat(style.paddingLeft) || 0;
+      const padR = parseFloat(style.paddingRight) || 0;
+      if (hasBg && (padL >= 12 || padR >= 12)) {
         ctaCount++;
       }
     }
@@ -524,23 +669,142 @@ JavaScript snippets for all automatable checks. Each returns a structured result
 
 ```javascript
 (() => {
+  // Parse CSS color string to {r, g, b} tuple
+  function parseColor(str) {
+    const match = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) return { r: +match[1], g: +match[2], b: +match[3] };
+    return null;
+  }
+
+  // Convert sRGB to CIELAB for perceptual distance
+  function srgbToLab(c) {
+    let r = c.r / 255, g = c.g / 255, b = c.b / 255;
+    r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+    g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+    b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+    let x = (r * 0.4124564 + g * 0.3575761 + b * 0.1804375) / 0.95047;
+    let y = (r * 0.2126729 + g * 0.7151522 + b * 0.0721750);
+    let z = (r * 0.0193339 + g * 0.1191920 + b * 0.9503041) / 1.08883;
+    const f = v => v > 0.008856 ? Math.pow(v, 1/3) : 7.787 * v + 16/116;
+    return { L: 116 * f(y) - 16, a: 500 * (f(x) - f(y)), b: 200 * (f(y) - f(z)) };
+  }
+
+  // Delta-E (CIE76) distance
+  function deltaE(lab1, lab2) {
+    return Math.sqrt(
+      Math.pow(lab1.L - lab2.L, 2) +
+      Math.pow(lab1.a - lab2.a, 2) +
+      Math.pow(lab1.b - lab2.b, 2)
+    );
+  }
+
   const els = document.querySelectorAll('*');
-  const colors = new Set();
+  const rawColors = new Set();
+  const colorTuples = [];
 
   els.forEach(el => {
     const style = getComputedStyle(el);
     if (el.innerText && el.innerText.trim().length > 0) {
-      colors.add(style.color);
+      rawColors.add(style.color);
     }
     if (style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent') {
-      colors.add(style.backgroundColor);
+      rawColors.add(style.backgroundColor);
     }
   });
 
-  const grade = colors.size <= 15 ? 'good' : colors.size <= 25 ? 'warning' : 'bad';
-  return { check: 'color_audit', distinctColors: colors.size, grade, values: [...colors] };
+  // Parse all colors to tuples
+  rawColors.forEach(c => {
+    const parsed = parseColor(c);
+    if (parsed) colorTuples.push({ str: c, rgb: parsed, lab: srgbToLab(parsed) });
+  });
+
+  // Cluster with Delta-E JND threshold of 3.0
+  const JND = 3.0;
+  const clustered = [];
+  const assigned = new Array(colorTuples.length).fill(false);
+  for (let i = 0; i < colorTuples.length; i++) {
+    if (assigned[i]) continue;
+    assigned[i] = true;
+    const cluster = [colorTuples[i].str];
+    for (let j = i + 1; j < colorTuples.length; j++) {
+      if (assigned[j]) continue;
+      if (deltaE(colorTuples[i].lab, colorTuples[j].lab) < JND) {
+        assigned[j] = true;
+        cluster.push(colorTuples[j].str);
+      }
+    }
+    clustered.push(cluster);
+  }
+
+  const rawCount = rawColors.size;
+  const clusteredCount = clustered.length;
+  const grade = clusteredCount <= 15 ? 'good' : clusteredCount <= 25 ? 'warning' : 'bad';
+  return { check: 'color_audit', rawDistinctColors: rawCount, clusteredDistinctColors: clusteredCount, grade, values: [...rawColors] };
 })()
 ```
+
+---
+
+## Scoring Framework
+
+### Tiered Sub-Scores
+
+Report separate scores for each measurement tier:
+
+| Tier | Description | Confidence |
+|------|-------------|-----------|
+| Deterministic [D] | Programmatic, reproducible | High |
+| Heuristic [H] | Programmatic with <5% error | Medium |
+| LLM-Assisted [J] | Pre-filtered LLM judgment | Lower |
+
+### Graduated Scoring
+
+These checks use 0 / 0.5 / 1.0 instead of binary pass/fail:
+
+| Check | 0 | 0.5 | 1.0 |
+|-------|---|-----|-----|
+| Touch target size | < 24px | 24-43px | >= 44px |
+| Color contrast | < 2:1 | 2:1-4.4:1 | >= 4.5:1 |
+| Scroll depth ratio | > 8x | 3-8x | <= 3x |
+| Font sizes count | > 12 | 7-12 | <= 6 |
+| Information density | > 700 words | 300-700 | 150-300 |
+| Animation duration | > 1500ms | 600-1500ms | 100-600ms |
+| Line length | > 100 or < 20 chars | 75-100 or 20-30 | 30-75 |
+
+### Category Weighting
+
+| Weight | Categories |
+|--------|-----------|
+| 2x | Accessibility (Cat 4) |
+| 1.5x | Forms & Input (Cat 7) |
+| 1x | All other categories |
+| 0.5x | Visual Complexity & Consistency (Cat 10) |
+
+### Critical Floor Rule
+
+If ANY check tagged as CRITICAL-severity fails, the total weighted score is capped at 50%.
+
+### Compound Conditions
+
+These checks require ALL conditions to pass (prevents gaming):
+
+1. **Autofill (Cat 7)**: `autocomplete` present AND valid HTML token (not "on"/"off"/empty)
+2. **Touch target (Cat 4)**: bounding rect >= 44x44 AND visible content area >= 30x30
+3. **Pagination (Cat 9)**: Pagination elements present AND > 1 navigable page link
+4. **Form label (Cat 4)**: `<label>` associated AND visible (rect area > 0) AND positioned near field
+5. **Hover state (Cat 2)**: Style changes on :hover AND perceivable change in color/bg/border/shadow/transform/opacity
+6. **Skeleton screen (Cat 8)**: Class found AND visible dimensions AND CSS animation present
+7. **Heading frequency (Cat 4)**: Headings every 200-300 words AND heading texts are not all identical
+
+### Conflicting Checks
+
+These pairs can conflict. Report as linked findings, not independent:
+
+1. Whitespace ratio (Cat 10) vs scroll depth (Cat 9)
+2. Touch target size (Cat 4) vs nav item count (Cat 6) on mobile
+3. CTA count = 1 (Cat 6) vs empty state CTA (Cat 9)
+4. Information density (Cat 4) vs heading frequency (Cat 4)
+5. Font sizes <= 6 (Cat 10) vs responsive type scales
 
 ---
 
@@ -566,14 +830,15 @@ Each category receives a severity grade based on the number and impact of failed
 
 ---
 
-## Binary Scorecard Rules
+## Scorecard Rules
 
-Each check maps to **Pass (1)** or **Fail (0)**. The total per screen is **X/75**.
+### Scoring
 
-For checks with three-tier thresholds (good / warning / bad):
-- **good** = Pass (1)
-- **warning** = Pass (1), but noted as a finding with MINOR severity
-- **bad** = Fail (0)
+- **`[D]` checks**: Pass (1) or Fail (0), with graduated scoring for the 7 checks listed above
+- **`[H]` checks**: Pass (1) or Fail (0)
+- **`[J]` checks**: Pass (1) or Fail (0), noted as LLM-assessed
+- **warning** threshold = Pass (1) but noted as MINOR finding
+- **bad** threshold = Fail (0)
 
 ### Per-Category Check Counts
 
@@ -595,28 +860,35 @@ For checks with three-tier thresholds (good / warning / bad):
 
 ### Output Template
 
-```markdown
+```
 ## UX Audit Results
 
-### Scorecard: X/Y Pass (Z%)
+### Scorecard: X/Y Weighted (Z%)
+
+| Tier | Pass/Total | Confidence |
+|------|------------|-----------|
+| Deterministic [D] | 30/33 | High |
+| Heuristic [H] | 18/22 | Medium |
+| LLM-Assisted [J] | 8/10 | Lower |
+| **Weighted Total** | **X/Y** | |
 
 ### [Screen Name] — [URL]
 
-| Category | Grade | Pass/Total | Findings |
-|----------|-------|------------|----------|
-| Visual Consistency | MINOR | 6/7 | 1 finding |
-| Component States | PASS | 8/8 | -- |
-| Copy & Microcopy | PASS | 7/7 | -- |
-| Accessibility | MINOR | 11/13 | 2 findings |
-| Layout & Responsiveness | PASS | 6/6 | -- |
-| Navigation & Wayfinding | MAJOR | 7/11 | 4 findings |
-| Forms & Input | MINOR | 11/13 | 2 findings |
-| Feedback & Response | PASS | 12/12 | -- |
-| Data Display & Scalability | CRITICAL | 3/10 | 7 findings |
-| Visual Complexity & Consistency | MINOR | 10/12 | 2 findings |
+| Category | Weight | Grade | Pass/Total | Findings |
+|----------|--------|-------|------------|----------|
+| Visual Consistency | 1x | MINOR | 6/7 | 1 finding |
+| Component States | 1x | PASS | 8/8 | -- |
+| Copy & Microcopy | 1x | PASS | 7/7 | -- |
+| Accessibility | 2x | MINOR | 11/13 | 2 findings |
+| Layout & Responsiveness | 1x | PASS | 6/6 | -- |
+| Navigation & Wayfinding | 1x | MAJOR | 7/11 | 4 findings |
+| Forms & Input | 1.5x | MINOR | 11/13 | 2 findings |
+| Feedback & Response | 1x | PASS | 12/12 | -- |
+| Data Display & Scalability | 1x | CRITICAL | 3/10 | 7 findings |
+| Visual Complexity & Consistency | 0.5x | MINOR | 10/12 | 2 findings |
 
 ### Findings Detail
-1. [MAJOR] **Finding title** — Description of what is wrong, where, and what it should be.
-2. [MINOR] **Finding title** — Description with specific measurements.
-3. ...
+1. [CRITICAL] `[D]` **Unpaginated list with 87 items on /admin** — ...
+2. [MAJOR] `[D]` **Nav has 12 top-level items** — ...
+3. [MINOR] `[H]` **Alignment has 9 clusters** — ...
 ```
