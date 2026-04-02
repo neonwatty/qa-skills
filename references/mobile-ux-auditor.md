@@ -137,6 +137,9 @@ Input zoom: iOS Safari automatically zooms in when a user focuses an input with 
 | 5.7 | Letter spacing | `[D]` `[research: WCAG 1.4.12]` | >= 0.12x font size | Computed `letterSpacing` relative to `fontSize`; flag if below 0.12em | MINOR |
 | 5.8 | Color contrast — normal text (AA) | `[D]` `[research: WCAG 1.4.3]` | >= 4.5:1 | Foreground vs background color extraction + luminance ratio | CRITICAL |
 | 5.9 | Color contrast — large text (AA) | `[D]` `[research: WCAG 1.4.3]` | >= 3:1 (>= 18pt or >= 14pt bold) | Same contrast formula, with size/weight check for large text classification | CRITICAL |
+
+> **Dark Mode Testing:** Run contrast checks at both `prefers-color-scheme: light` and `prefers-color-scheme: dark` via `page.emulateMedia()`. Report both sets of results separately. Mobile apps are particularly prone to dark mode contrast failures due to reduced color palettes.
+
 | 5.10 | Text scaling at 200% | `[H]` | No truncation or clipping | Set browser zoom to 200%, check for `overflow: hidden` clipping or text truncation | MAJOR |
 
 ### iOS Default Text Style Reference
