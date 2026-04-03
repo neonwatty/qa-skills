@@ -1,7 +1,7 @@
 {
   "name": "qa-skills",
   "version": "2.0.0",
-  "description": "QA testing pipeline — generate workflow docs, convert to Playwright E2E tests, run interactively or in CI, and profile Next.js performance via authenticated browser sessions. Supports desktop, mobile, and multi-user flows. Playwright-only, with built-in storageState authentication and Vercel preview CI generation.",
+  "description": "QA testing pipeline with 5 personas (smoke, UX, adversarial, performance, mobile) — generate workflow docs, convert to Playwright E2E tests, run interactively or in CI. Supports quantified UX scoring with before/after binary scorecards, Next.js performance profiling, and mobile UX auditing against iOS HIG and Material Design 3 standards.",
   "author": {
     "name": "Jeremy Watt",
     "url": "https://github.com/neonwatty"
@@ -19,7 +19,10 @@
     "performance",
     "web-vitals",
     "bundle-size",
-    "nextjs"
+    "nextjs",
+    "mobile-ux",
+    "ux-audit",
+    "scorecard"
   ],
   "skills": "./skills",
   "repository": "https://github.com/neonwatty/qa-skills"
