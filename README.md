@@ -1,6 +1,6 @@
 # Claude QA Skills
 
-QA testing pipeline for [Claude Code](https://claude.ai/code) — generate workflow docs, convert to Playwright E2E tests, run interactively or in CI, and audit apps with five specialized QA agents. Supports desktop, mobile, and multi-user flows with profile-based authentication.
+QA testing pipeline for [Claude Code](https://claude.ai/code) — generate workflow docs, convert to Playwright E2E tests, run interactively or in CI, and audit apps with six specialized QA agents. Supports desktop, mobile, and multi-user flows with profile-based authentication.
 
 > **Full walkthrough:** [Claude Code Browser Testing and iOS Automation with MCP Workflows](https://neonwatty.com/posts/claude-code-workflow-testing-mcp/)
 
@@ -81,7 +81,7 @@ playwright-cli install
 |-------|---------|-------------|
 | **use-profiles** | Automatic | Loads saved auth profiles before browser automation |
 
-## Agents (5)
+## Agents (6)
 
 Autonomous QA agents that navigate the app, inspect screens, and produce structured reports. Each agent records observations to a learnings ledger after its session.
 
@@ -90,6 +90,7 @@ Autonomous QA agents that navigate the app, inspect screens, and produce structu
 | **smoke-tester** | Optimistic — follows happy path | Broken flows, 500s, dead links |
 | **ux-auditor** | Obsessive — inspects every detail | Inconsistent spacing, missing states, bad copy, accessibility gaps |
 | **adversarial-breaker** | Hostile — tries to break things | Auth bypasses, double-submits, state corruption, input abuse |
+| **security-auditor** | Systematic — measures security posture | OWASP compliance, header config, session security, injection patterns |
 | **mobile-ux-auditor** | Obsessive — mobile-specific | Touch targets, iOS HIG violations, Safari quirks, mobile form UX |
 | **performance-profiler** | Quantitative — measures everything | Slow Web Vitals, bundle bloat, DOM health, code anti-patterns |
 
