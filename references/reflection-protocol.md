@@ -25,7 +25,7 @@ If you recorded any observations, include this line in your output:
 
 ### Threshold Nudge
 
-After recording observations (or if you recorded none), count the total entries and unique sources in `.qa-learnings/ledger.md` by scanning for `## ` entry headers. If the ledger has **5 or more entries** OR **3 or more unique sources**, append an additional line:
+After recording observations (or if you recorded none), check whether `.qa-learnings/ledger.md` exists. If it does not, skip this check. If it does, count the total entries and unique sources by scanning for `## ` entry headers. If the ledger has **5 or more entries** OR **3 or more unique sources**, append an additional line:
 
 `The learnings ledger has [N] entries from [M] sources. Consider running /submit-learnings to share with plugin maintainers.`
 
