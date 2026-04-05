@@ -41,7 +41,7 @@ playwright-cli install
 
 > **Framework support:** Route discovery is optimized for **Next.js** (App Router and Pages Router), with support for React Router, Remix, and SvelteKit. Other frameworks fall back to generic route-pattern matching.
 
-## Skills (13)
+## Skills (14)
 
 ### Generators
 
@@ -74,6 +74,7 @@ playwright-cli install
 | **keyword-wedge** | "keyword wedge" | Cross-references codebase with Search Console, PostHog, and Keyword Planner for SEO footholds |
 | **trust-builder** | "trust builder" | Finds free-value trust-building opportunities before asking for commitment |
 | **review-learnings** | "review learnings" | Synthesizes accumulated QA observations into prioritized plugin improvements |
+| **submit-learnings** | "submit learnings" | Filters and submits QA observations as GitHub issues on the plugin repo |
 
 ### Utility
 
