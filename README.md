@@ -130,3 +130,7 @@ claude --plugin-dir /path/to/qa-skills
 
 - [claude-dev-skills](https://github.com/neonwatty/claude-dev-skills) — Developer workflow automation
 - [claude-interview-skills](https://github.com/neonwatty/claude-interview-skills) — Structured interviews for feature planning
+
+## More from Jeremy Watt
+
+[All projects](https://neonwatty.com/projects/) · [Blog](https://neonwatty.com/posts/)
